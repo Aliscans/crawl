@@ -33,6 +33,7 @@
 #include "output.h"
 #include "player.h"
 #include "prompt.h"
+#include "showsymb.h"
 #include "spl-book.h"
 #include "stash.h"
 #include "state.h"
@@ -898,9 +899,50 @@ public:
     ShopMenu(shop_struct& _shop, const level_pos& _pos, bool _can_purchase);
 };
 
+#ifndef USE_TILE // This is compatible with tiles, but unused.
+// Return true if an item_def uses the subtype_rnd element (part of a union).
+static bool _item_uses_subtype_rnd(const item_def &item)
+{
+    // Uses unrand_idx
+    if (is_unrandom_artefact(item))
+        return false;
+
+    switch (item.base_type)
+    {
+        case OBJ_WANDS:
+        case OBJ_POTIONS:
+        case OBJ_SCROLLS:
+        case OBJ_JEWELLERY:
+        case OBJ_STAVES:
+        return true;
+        default:
+        return false;
+    }
+}
+#endif
+
 class ShopEntry : public InvEntry
 {
     ShopMenu& menu;
+
+    const string item_glyph() const
+    {
+#ifdef USE_TILE // Tiles add a glyph elsewhere.
+        return "";
+#else
+        if (!shoptype_identifies_stock(menu.shop.type)
+            || !shop_item_unknown(*item))
+        {
+            return glyph_to_tagstr(get_item_glyph(*item))+" ";
+        }
+
+        item_def copy = *item;
+        copy.rnd = 1;
+        if (_item_uses_subtype_rnd(copy))
+            copy.subtype_rnd = 1; 
+        return glyph_to_tagstr(get_item_glyph(copy))+" ";
+#endif
+    }
 
     string get_text(bool need_cursor = false) const override
     {
@@ -926,7 +968,8 @@ class ShopEntry : public InvEntry
         const string keystr = colour_to_str(keycol);
         const string itemstr =
             colour_to_str(menu_colour(text, item_prefix(*item), tag));
-        return make_stringf(" <%s>%c%c%c%c</%s><%s>%4d gold   %s%s</%s>",
+        return make_stringf(" %s<%s>%c%c%c%c</%s><%s>%4d gold   %s%s</%s>",
+                            item_glyph().c_str(),
                             keystr.c_str(),
                             hotkeys[0],
                             need_cursor ? '[' : ' ',
