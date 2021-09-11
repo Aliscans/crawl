@@ -2593,22 +2593,22 @@ static void _describe_oos_square(const coord_def& where)
 {
     mprf(MSGCH_EXAMINE_FILTER, "You can't see that place.");
 
-    if (!in_bounds(where) || !env.map_knowledge(where).seen())
+    if (!in_bounds(where))
+        dprf("(out of bounds)");
+    else if (!env.map_knowledge(where).seen())
     {
-#ifdef DEBUG_DIAGNOSTICS
-        if (!in_bounds(where))
-            dprf("(out of bounds)");
-        else
-            dprf("(map: %x)", env.map_knowledge(where).flags);
-#endif
-        return;
+        if (env.map_knowledge(where).detected_item())
+            mprf(MSGCH_EXAMINE_FILTER, "You have detected an item there.");
+        dprf("(map: %x)", env.map_knowledge(where).flags);
     }
-
-    describe_stash(where);
-    _describe_oos_feature(where);
+    else
+    {
+        describe_stash(where);
+        _describe_oos_feature(where);
 #ifdef DEBUG_DIAGNOSTICS
-    _debug_describe_feature_at(where);
+        _debug_describe_feature_at(where);
 #endif
+    }
 }
 
 static bool _mons_is_valid_target(const monster* mon, targ_mode_type mode,
