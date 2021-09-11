@@ -509,6 +509,10 @@ demon whip
 
 A terrible weapon, woven in the depths of the inferno.
 %%%%
+detected item
+
+You have detected that an item is here, but have not seen it yet.
+%%%%
 dire flail
 
 A flail with long spikes and a heavy head.

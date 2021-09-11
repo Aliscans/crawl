@@ -1811,6 +1811,10 @@ string item_def::name_aux(description_level_type desc, bool terse, bool ident,
         buff << "gold piece";
         break;
 
+    case OBJ_DETECTED:
+        buff << "detected item";
+        break;
+
     case OBJ_CORPSES:
     {
         if (dbname && item_typ == CORPSE_SKELETON)

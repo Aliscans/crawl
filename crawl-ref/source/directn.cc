@@ -2519,7 +2519,11 @@ void full_describe_square(const coord_def &c, bool cleanup)
     }
     if (obj)
     {
-        list_items = item_list_in_stash(c);
+        // OBJ_DETECTED isn't a real item, so isn't in the stash.
+        if (obj->base_type == OBJ_DETECTED)
+            list_items.push_back(*obj);
+        else
+            list_items = item_list_in_stash(c);
         quantity += list_items.size();
     }
     // I'm not sure if features should be included. But it seems reasonable to
