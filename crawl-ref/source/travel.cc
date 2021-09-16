@@ -3150,17 +3150,16 @@ static bool _find_transtravel_square(const level_pos &target, bool verbose)
     return false;
 }
 
+// Return false if start_travel() does nothing. 
+bool can_start_travel(const coord_def& p)
+{
+	return p != you.pos()
+		   && _is_travelsafe_square(p, true);
+}
+
 void start_travel(const coord_def& p)
 {
-    // Redundant target?
-    if (p == you.pos())
-        return;
-
-    // Can we even travel to this square?
-    if (!in_bounds(p))
-        return;
-
-    if (!_is_travelsafe_square(p, true))
+    if (!can_start_travel(p))
         return;
 
     you.travel_x = p.x;

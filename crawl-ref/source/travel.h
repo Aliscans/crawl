@@ -92,6 +92,7 @@ level_id find_down_level(level_id curr);
 
 void start_translevel_travel(const level_pos &pos);
 
+bool can_start_travel(const coord_def& p);
 void start_travel(const coord_def& p);
 
 command_type travel();

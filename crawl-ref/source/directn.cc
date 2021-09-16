@@ -304,6 +304,22 @@ void direction_chooser::print_top_prompt() const
     }
 }
 
+// return true if trying to describe a target will have any effect.
+static bool _can_describe_target(const coord_def &target)
+{
+    return map_bounds(target) && env.map_knowledge(target).known();
+}
+
+// return true if trying to get an item on a square has any effect.
+// True if you know the square and the item on it.
+static bool _can_pickup_item(const coord_def &target)
+{
+    if (!in_bounds(target)) return false;
+    const auto &cell = env.map_knowledge(target);
+    return cell.item() && cell.item()->is_valid(true)
+           && DNGN_UNSEEN != cell.feat();
+}
+
 void direction_chooser::print_key_hints() const
 {
     // TODO: build this as a vector and insert ,s and \ns in a smarter way
@@ -311,10 +327,11 @@ void direction_chooser::print_key_hints() const
 
     if (just_looking)
     {
-        if (you.see_cell(target()))
+        if (_can_describe_target(target()))
             prompt += ", v - describe";
-        prompt += ", . - travel";
-        if (in_bounds(target()) && env.map_knowledge(target()).item())
+        if (can_start_travel(target()))
+            prompt += ", . - travel";
+        if (_can_pickup_item(target()))
             prompt += ", g - get item";
     }
     else
@@ -1374,6 +1391,8 @@ bool direction_chooser::select(bool allow_out_of_range, bool endpoint)
 {
     const monster* mons = monster_at(target());
 
+    if (just_looking && !can_start_travel(target())) return false;
+
     if (restricts == DIR_SHADOW_STEP)
     {
         targeter_shadow_step &tgt =
@@ -1399,14 +1418,11 @@ bool direction_chooser::select(bool allow_out_of_range, bool endpoint)
 
 bool direction_chooser::pickup_item()
 {
-    item_def *ii = nullptr;
-    if (in_bounds(target()))
-        ii = env.map_knowledge(target()).item();
-    if (!ii || !ii->is_valid(true))
-    {
-        mprf(MSGCH_EXAMINE_FILTER, "You can't see any item there.");
+    if (!_can_pickup_item(target()))
         return false;
-    }
+
+    item_def *ii = env.map_knowledge(target()).item();
+
     ii->flags |= ISFLAG_THROWN; // make autoexplore greedy
 
     // From this point, if there's no item, we'll fake one. False info means
@@ -2019,7 +2035,7 @@ void direction_chooser::full_describe()
 
 void direction_chooser::describe_target()
 {
-    if (!map_bounds(target()) || !env.map_knowledge(target()).known())
+    if (!_can_describe_target(target()))
         return;
     full_describe_square(target(), false);
     need_all_redraw = true;
