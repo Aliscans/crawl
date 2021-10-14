@@ -1618,12 +1618,13 @@ static afsz _abort_for_stat_zero(const item_def &item, int prop_str,
 }
 
 // Checks whether a to-be-worn or to-be-removed item affects
-// character stats and whether wearing/removing it could be fatal.
+// character stats and whether wearing/removing it could cause draining.
 // If so, warns the player, or just returns false if quiet is true.
 static bool _safe_to_remove_or_wear(const item_def &item, const item_def
                                     *old_item, bool remove, bool quiet)
 {
-    if (remove && !safe_to_remove(item, quiet))
+    if (remove && !safe_to_remove(item, quiet)
+        || old_item && !safe_to_remove(*old_item, quiet))
         return false;
 
     int str1 = 0, dex1 = 0, int1 = 0, str2 = 0, dex2 = 0, int2 = 0;
