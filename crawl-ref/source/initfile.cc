@@ -167,6 +167,14 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
         new BoolGameOption(game.fully_random, {"fully_random"}, false),
 #ifndef DGAMELAUNCH
+#ifdef USE_TILE_LOCAL
+#define RESTART_DEFAULT MB_TRUE
+#else
+#define RESTART_DEFAULT MB_MAYBE
+#endif
+        new MultipleChoiceDefaultGameOption<maybe_bool>(
+            SIMPLE_NAME(restart_after_game), RESTART_DEFAULT,
+            MB_MAYBE, MB_FALSE, MB_TRUE, {{"maybe", MB_MAYBE}}),
         new BoolGameOption(SIMPLE_NAME(restart_after_save), true),
         new BoolGameOption(SIMPLE_NAME(newgame_after_quit), false),
         new BoolGameOption(SIMPLE_NAME(name_bypasses_menu), true),
@@ -417,6 +425,9 @@ const vector<GameOption*> game_options::build_options_list()
         new IntGameOption(SIMPLE_NAME(tile_overlay_alpha_percent), 40, 0, 100),
 #endif
 #ifdef USE_TILE_LOCAL
+        new MultipleChoiceDefaultGameOption<screen_mode>(
+            SIMPLE_NAME(tile_full_screen), SCREENMODE_AUTO, SCREENMODE_AUTO,
+            SCREENMODE_WINDOW, SCREENMODE_FULL, {{"auto", SCREENMODE_AUTO}}),
         new BoolGameOption(SIMPLE_NAME(tile_single_column_menus), true),
         new StringGameOption(SIMPLE_NAME(tile_font_crt_file), MONOSPACED_FONT),
         new StringGameOption(SIMPLE_NAME(tile_font_stat_file), MONOSPACED_FONT),
@@ -477,9 +488,17 @@ const vector<GameOption*> game_options::build_options_list()
             SIMPLE_NAME(tile_web_mobile_input_helper), "auto", "false", "true",
             {{"auto", "auto"}}),
 #endif
+#if defined(USE_TILE_LOCAL) && defined(TOUCH_UI)
+        new MultipleChoiceDefaultGameOption<maybe_bool>(
+            SIMPLE_NAME(tile_use_small_layout), MB_MAYBE, MB_MAYBE, MB_FALSE,
+             MB_TRUE, {{"auto", MB_MAYBE}}),
+#endif
         new GameOptionHeading("Character Dump: Saving"),
         new BoolGameOption(SIMPLE_NAME(dump_on_save), true),
         new GameOptionHeading("Character Dump: Items and Kills"),
+        new MultipleChoiceDefaultGameOption<int>(SIMPLE_NAME(dump_kill_places),
+            KDO_ONE_PLACE, KDO_ONE_PLACE, {{"none", KDO_NO_PLACES},
+            {"single", KDO_ONE_PLACE}, {"all", KDO_ALL_PLACES}}),
         new IntGameOption(SIMPLE_NAME(dump_item_origin_price), -1, -1),
         new IntGameOption(SIMPLE_NAME(dump_message_count), 40),
         new GameOptionHeading("Character Dump: Notes"),
@@ -1208,7 +1227,6 @@ void game_options::reset_options()
                               | ES_TRANSPORTER | ES_GREEDY_PICKUP_SMART
                               | ES_GREEDY_VISITED_ITEM_STACK);
 
-    dump_kill_places       = KDO_ONE_PLACE;
     dump_item_origins      = IODS_ARTEFACTS;
 
     flush_input[ FLUSH_ON_FAILURE ]     = true;
@@ -1261,12 +1279,6 @@ void game_options::reset_options()
     restart_after_save = false;
     newgame_after_quit = false;
     name_bypasses_menu = true;
-#else
-#ifdef USE_TILE_LOCAL
-    restart_after_game = MB_TRUE;
-#else
-    restart_after_game = MB_MAYBE;
-#endif
 #endif
 
 #if defined(WIZARD) && defined(DGAMELAUNCH)
@@ -1278,10 +1290,9 @@ void game_options::reset_options()
 #endif
     terp_files.clear();
 
-#ifdef USE_TILE_LOCAL
+#if defined(USE_TILE_LOCAL) && !defined(TOUCH_UI)
 
     // window layout
-    tile_full_screen      = SCREENMODE_AUTO;
     tile_use_small_layout = MB_MAYBE;
 #endif
 
@@ -3248,10 +3259,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         else
             report_error("Bad fire item start index: %s\n", field.c_str());
     }
-#ifndef DGAMELAUNCH
-    else if (key == "restart_after_game")
-        restart_after_game = read_maybe_bool(field);
-#endif
     else if (key == "fire_order")
         set_fire_order(field, plus_equal, caret_equal);
     else if (key == "fire_order_spell" && runscript)
@@ -3691,12 +3698,6 @@ void game_options::read_option_line(const string &str, bool runscript)
 
         new_dump_fields(field, !minus_equal, caret_equal);
     }
-    else if (key == "dump_kill_places")
-    {
-        dump_kill_places = (field == "none" ? KDO_NO_PLACES :
-                            field == "all"  ? KDO_ALL_PLACES
-                                            : KDO_ONE_PLACE);
-    }
     else if (key == "kill_map")
     {
         // TODO: treat this as a map option (e.g. kill_map.you = friendly)
@@ -3773,22 +3774,6 @@ void game_options::read_option_line(const string &str, bool runscript)
             report_error(possible_error.c_str(), orig_field.c_str());
     }
 #ifdef USE_TILE
-#ifdef USE_TILE_LOCAL
-    else if (key == "tile_full_screen")
-    {
-        const maybe_bool fs_val = read_maybe_bool(field);
-        if (fs_val == MB_TRUE)
-            tile_full_screen = SCREENMODE_FULL;
-        else if (fs_val == MB_FALSE)
-            tile_full_screen = SCREENMODE_WINDOW;
-        else
-            tile_full_screen = SCREENMODE_AUTO;
-    }
-#endif // USE_TILE_LOCAL
-#ifdef TOUCH_UI
-    else if (key == "tile_use_small_layout")
-        tile_use_small_layout = read_maybe_bool(field);
-#endif
     else if (key == "tile_show_player_species" && field == "true")
     {
         field = "playermons";

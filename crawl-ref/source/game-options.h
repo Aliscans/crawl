@@ -395,11 +395,49 @@ public:
         return choose_option_from_UI(this, list);
     }
 
-private:
+protected:
     T &value, default_value;
     map<string, T> choices;
     map<T, string> rchoices; // T->string, with only the first copy of dups.
 };
+
+// Like a MultipleChoiceGameOption, but unrecognised values are mapped to
+// _other rather than generating an error. _other must be in _choices
+template<typename T>
+class MultipleChoiceDefaultGameOption : public MultipleChoiceGameOption<T>
+{
+public:
+    typedef vector<pair<string, T>> vpst;
+    MultipleChoiceDefaultGameOption(T &_val, vector<string> _names,
+        T _default, T _other, vpst _choices)
+        : MultipleChoiceGameOption<T>(_val, _names, _default, _choices),
+          other_value(_other)
+        {
+            ASSERT(this->rchoices.end() != this->rchoices.find(_other));
+        }
+
+    MultipleChoiceDefaultGameOption(T &_val, vector<string> _names,
+        T _default, T _other, T _no, T _yes, vpst _choices)
+        : MultipleChoiceGameOption<T>(_val, _names, _default, _no, _yes,
+          _choices), other_value(_other)
+        {
+            ASSERT(this->rchoices.end() != this->rchoices.find(_other));
+        }
+
+    string loadFromString(const std::string &field, rc_line_type ltyp) override
+    {
+        const auto choice = this->choices.find(field);
+        if (choice == this->choices.end())
+            this->value = other_value;
+        else
+            this->value = choice->second;
+        return GameOption::loadFromString(field, ltyp);
+    }
+
+private:
+    T other_value;
+};
+
 
 bool read_bool(const std::string &field, bool def_value);
 maybe_bool read_maybe_bool(const std::string &field);
