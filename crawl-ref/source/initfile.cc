@@ -564,6 +564,8 @@ const vector<GameOption*> game_options::build_options_list()
                                  {"feature"}, this, {}, ";"),
         new CustomListGameOption(&game_options::set_mon_glyph, _rcfile_no_caret,
                                  {"mon_glyph"}, this),
+        new CustomListGameOption(&game_options::set_item_glyph, {"item_glyph"},
+                                 this),
         new BoolGameOption(SIMPLE_NAME(use_fake_player_cursor), true),
         new BoolGameOption(SIMPLE_NAME(show_player_species), false),
         new BoolGameOption(SIMPLE_NAME(use_modifier_prefix_keys), true),
@@ -1396,9 +1398,6 @@ void game_options::reset_options()
     message_colour_mappings.clear();
     named_options.clear();
 
-    item_glyph_overrides.clear();
-    item_glyph_cache.clear();
-
     // Map each category to itself. The user can override in init.txt
     kill_map[KC_YOU] = KC_YOU;
     kill_map[KC_FRIENDLY] = KC_FRIENDLY;
@@ -1556,6 +1555,28 @@ string game_options::set_mon_glyph(vector<string> &fields)
             error = remove_mon_glyph_override(field.substr(1));
         else
             error = add_mon_glyph_override(field);
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(mon_glyph) "+list;
+}
+
+string game_options::set_item_glyph(vector<string> &fields)
+{
+    item_glyph_overrides_w.clear();
+    item_glyph_cache.clear();
+    vector<string> errors;
+
+    for (const string &field : fields)
+    {
+        string error;
+        if (field[0] == ' ')
+            error = remove_item_glyph_override(field.substr(1));
+        else
+            error = add_item_glyph_override(field);
         if (!error.empty())
             errors.emplace_back(error);
     }
@@ -1865,33 +1886,33 @@ string game_options::add_mon_glyph_override(const string &text)
     return "";
 }
 
-void game_options::remove_item_glyph_override(const string &text, bool /*prepend*/)
+string game_options::remove_item_glyph_override(const string &text)
 {
     string key = text;
     trim_string(key);
 
-    erase_if(item_glyph_overrides,
+    erase_if(item_glyph_overrides_w,
              [&key](const item_glyph_override_type& arg)
              { return key == arg.first; });
+    return "";
 }
 
-void game_options::add_item_glyph_override(const string &text, bool prepend)
+string game_options::add_item_glyph_override(const string &text)
 {
-    vector<string> override = split_string(":", text);
-    if (override.size() != 2u)
-        return;
+    unsigned colon = text.find(':', 1);
+    if (text.npos == colon)
+        return "Missing :";
+    else if (text.size() == colon+1)
+        return "Missing replacement string";
+    string from = trimmed_string(text.substr(0, colon));
+    string to = trimmed_string(text.substr(colon+1));
 
-    cglyph_t mdisp = parse_mon_glyph(override[1]);
+    cglyph_t mdisp;
+    if (!_parse_mon_glyph(mdisp, to))
+        return "Failed to parse replacement string";
     if (mdisp.ch || mdisp.col)
-    {
-        if (prepend)
-        {
-            item_glyph_overrides.emplace(item_glyph_overrides.begin(),
-                                               override[0],mdisp);
-        }
-        else
-            item_glyph_overrides.emplace_back(override[0], mdisp);
-    }
+        item_glyph_overrides_w.emplace_back(from, mdisp);
+    return "";
 }
 
 string game_options::remove_feature_override(const string &text)
@@ -3309,19 +3330,6 @@ void game_options::read_option_line(const string &str, bool runscript)
     }
     else if (starts_with(key, "cset")) // compatibility with old rcfiles
         read_option_line("display_char += "+field, runscript);
-    else if (key == "item_glyph")
-    {
-        if (plain)
-        {
-            item_glyph_overrides.clear();
-            item_glyph_cache.clear();
-        }
-
-        if (minus_equal)
-            split_parse(field, ",", &game_options::remove_item_glyph_override);
-        else
-            split_parse(field, ",", &game_options::add_item_glyph_override, caret_equal);
-    }
     else if (key == "arena_teams")
         game.arena_teams = field;
     // [ds] Allow changing map only if the map hasn't been set on the

@@ -159,9 +159,6 @@ public:
     string      basefilename; // Base (pathless) file name
     int         line_num;     // Current line number being processed.
 
-    // View options
-    typedef pair<string, cglyph_t> item_glyph_override_type;
-    vector<item_glyph_override_type > item_glyph_overrides;
     map<string, cglyph_t> item_glyph_cache;
 
     string      save_dir;       // Directory where saves and bones go.
@@ -641,6 +638,8 @@ private:
     map<dungeon_feature_type, FixedVector<char32_t, 2> >
         feature_symbol_overrides_w;
     map<monster_type, cglyph_t> mon_glyph_overrides_w;
+    typedef pair<string, cglyph_t> item_glyph_override_type;
+    vector<item_glyph_override_type > item_glyph_overrides_w;
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -656,6 +655,8 @@ public:
         &feature_colour_overrides = feature_colour_overrides_w;
     const map<monster_type, cglyph_t>
         &mon_glyph_overrides = mon_glyph_overrides_w;
+    const vector<item_glyph_override_type >
+        &item_glyph_overrides = item_glyph_overrides_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -710,6 +711,7 @@ private:
     string set_display_char(vector<string>&fields);
     string set_feature(vector<string>&fields);
     string set_mon_glyph(vector<string> &fields);
+    string set_item_glyph(vector<string> &fields);
     void str_to_enemy_hp_colour(const string &, bool);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
@@ -723,8 +725,8 @@ private:
     string add_mon_glyph_override(const string &);
     string remove_mon_glyph_override(const string &);
     cglyph_t parse_mon_glyph(const string &s) const;
-    void add_item_glyph_override(const string &, bool prepend);
-    void remove_item_glyph_override(const string &, bool prepend);
+    string add_item_glyph_override(const string &);
+    string remove_item_glyph_override(const string &);
     void set_option_fragment(const string &s, bool prepend);
     bool set_lang(const char *s);
     void set_fake_langs(const string &input);
