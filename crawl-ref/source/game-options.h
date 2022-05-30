@@ -60,13 +60,20 @@ public:
         return "";
     }
 
-    virtual void load_from_UI() = 0;
+    virtual bool load_from_UI() = 0;
     virtual const string str() const = 0;
 
     const vector<string> &getNames() const { return names; }
     const std::string name() const { return *names.begin(); }
 
     bool was_loaded() const { return loaded; }
+
+    void (*on_change)(game_options *) = [](game_options *) {};
+    GameOption *set_on_change(void (*_on_change)(game_options *))
+    {
+        on_change = _on_change;
+        return this;
+    }
 
 protected:
     vector<string> names;
@@ -83,13 +90,13 @@ class GameOptionHeading : public GameOption
 public:
     GameOptionHeading(string _heading) : GameOption({""}), heading(_heading) { }
     const string str() const override { return heading; }
-    void load_from_UI() override { }
+    bool load_from_UI() override { return false; }
 private:
     const string heading;
 };
 
-void load_string_from_UI(GameOption *option);
-void choose_option_from_UI(GameOption *caller, vector<string> choices);
+bool load_string_from_UI(GameOption *option);
+bool choose_option_from_UI(GameOption *caller, vector<string> choices);
 
 class BoolGameOption : public GameOption
 {
@@ -112,7 +119,7 @@ public:
     }
 
     string loadFromString(const std::string &field, rc_line_type) override;
-    void load_from_UI() override;
+    bool load_from_UI() override;
 
 private:
     bool &value;
@@ -135,7 +142,7 @@ public:
 
     string loadFromString(const std::string &field, rc_line_type) override;
     const string str() const override;
-    void load_from_UI() override;
+    bool load_from_UI() override;
 
 private:
     unsigned &value;
@@ -157,7 +164,7 @@ public:
 
     string loadFromString(const std::string &field, rc_line_type) override;
     const string str() const override;
-    void load_from_UI() override;
+    bool load_from_UI() override;
 
 private:
     unsigned &value;
@@ -180,7 +187,7 @@ public:
 
     string loadFromString(const std::string &field, rc_line_type) override;
     const string str() const override;
-    void load_from_UI() override { load_string_from_UI(this); }
+    bool load_from_UI() override { return load_string_from_UI(this); }
 
 private:
     int &value;
@@ -201,7 +208,7 @@ public:
 
     string loadFromString(const std::string &field, rc_line_type) override;
     const string str() const override;
-    void load_from_UI() override { load_string_from_UI(this); }
+    bool load_from_UI() override { return load_string_from_UI(this); }
 
 private:
     string &value;
@@ -222,7 +229,7 @@ public:
 
     string loadFromString(const std::string &field, rc_line_type) override;
     const string str() const override;
-    void load_from_UI() override { load_string_from_UI(this); }
+    bool load_from_UI() override { return load_string_from_UI(this); }
 
 private:
     VColour &value;
@@ -251,7 +258,7 @@ public:
 
     string loadFromString(const string &field, rc_line_type ltyp) override;
     const string str() const override;
-    void load_from_UI() override { load_string_from_UI(this); }
+    bool load_from_UI() override { return load_string_from_UI(this); }
 
 private:
     colour_thresholds parse_colour_thresholds(const string &field,
@@ -305,9 +312,9 @@ public:
             ss << ", " << s;
         return ss.str().substr(2);
     }
-    void load_from_UI() override
+    bool load_from_UI() override
     {
-        load_string_from_UI(this);
+        return load_string_from_UI(this);
     }
 
 private:
@@ -378,14 +385,14 @@ public:
         return choice->second;
     }
 
-    void load_from_UI() override
+    bool load_from_UI() override
     {
         const string prompt = string("Select a value for ")+name()+":";
         vector<string> list;
         for (auto c : rchoices)
             list.emplace_back(c.second);
 
-        choose_option_from_UI(this, list);
+        return choose_option_from_UI(this, list);
     }
 
 private:

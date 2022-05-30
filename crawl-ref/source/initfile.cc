@@ -122,6 +122,11 @@ static bool _first_greater(const pair<int, int> &l, const pair<int, int> &r)
     return l.first > r.first;
 }
 
+static void _dirty_prefs(game_options *caller)
+{
+    caller->prefs_dirty = true;
+}
+
 const vector<GameOption*> game_options::build_options_list()
 {
 #ifndef DEBUG
@@ -165,7 +170,8 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(newgame_after_quit), false),
         new BoolGameOption(SIMPLE_NAME(name_bypasses_menu), true),
 #endif
-        new BoolGameOption(SIMPLE_NAME(default_manual_training), false),
+        (new BoolGameOption(SIMPLE_NAME(default_manual_training), false))
+            ->set_on_change(_dirty_prefs),
         new BoolGameOption(SIMPLE_NAME(autopickup_starting_ammo), true),
         new BoolGameOption(SIMPLE_NAME(suppress_startup_errors), false),
         new GameOptionHeading("File System and Sound"),
@@ -308,16 +314,20 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(cloud_status), !is_tiles()),
         new BoolGameOption(SIMPLE_NAME(always_show_zot), false),
 #ifdef USE_TILE_WEB
-        new BoolGameOption(SIMPLE_NAME(action_panel_show), true),
+        (new BoolGameOption(SIMPLE_NAME(action_panel_show), true))
+            ->set_on_change(_dirty_prefs),
         new ListGameOption<text_pattern>(SIMPLE_NAME(action_panel_filter)),
         new BoolGameOption(SIMPLE_NAME(action_panel_show_unidentified), false),
-        new IntGameOption(SIMPLE_NAME(action_panel_scale), 100, 20, 1600),
-        new MultipleChoiceGameOption<string>(
+        (new IntGameOption(SIMPLE_NAME(action_panel_scale), 100, 20, 1600))
+            ->set_on_change(_dirty_prefs),
+        (new MultipleChoiceGameOption<string>(
             SIMPLE_NAME(action_panel_orientation), "horizontal",
-            {{"horizontal", "horizontal"}, {"vertical", "vertical"}}),
+            {{"horizontal", "horizontal"}, {"vertical", "vertical"}}))
+            ->set_on_change(_dirty_prefs),
         new StringGameOption(SIMPLE_NAME(action_panel_font_family),
                              "monospace"),
-        new IntGameOption(SIMPLE_NAME(action_panel_font_size), 16),
+        (new IntGameOption(SIMPLE_NAME(action_panel_font_size), 16))
+            ->set_on_change(_dirty_prefs),
         new BoolGameOption(SIMPLE_NAME(action_panel_glyphs), false),
 #endif
 #ifdef DGL_SIMPLE_MESSAGING
@@ -326,7 +336,8 @@ const vector<GameOption*> game_options::build_options_list()
         new GameOptionHeading("Interface: Quivers, firing, and ammo"),
         new IntGameOption(SIMPLE_NAME(fail_severity_to_quiver), 3, -1, 5),
         new BoolGameOption(SIMPLE_NAME(launcher_autoquiver), true),
-        new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false),
+        (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
+            ->set_on_change(_dirty_prefs),
         new GameOptionHeading("Interface: Tiles Options"),
 #ifdef USE_TILE
         new StringGameOption(SIMPLE_NAME(tile_show_items), "!?/=([)}:|"),
@@ -5790,8 +5801,11 @@ void edit_game_prefs()
         entry->on_select = [entry](const MenuEntry&)
         {
             GameOption *opt = static_cast<GameOption*>(entry->data);
-            opt->load_from_UI();
-            entry->text = _option_line(opt, 36, 79-36-4);
+            if (opt->load_from_UI())
+            {
+                entry->text = _option_line(opt, 36, 79-36-4);
+                opt->on_change(&Options);
+            }
             return true;
         };
         menu.add_entry(entry);
