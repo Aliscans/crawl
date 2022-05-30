@@ -163,7 +163,6 @@ public:
     map<dungeon_feature_type, feature_def> feature_colour_overrides;
     map<dungeon_feature_type, FixedVector<char32_t, 2> > feature_symbol_overrides;
     map<monster_type, cglyph_t> mon_glyph_overrides;
-    char32_t cset_override[NUM_DCHAR_TYPES];
     typedef pair<string, cglyph_t> item_glyph_override_type;
     vector<item_glyph_override_type > item_glyph_overrides;
     map<string, cglyph_t> item_glyph_cache;
@@ -638,6 +637,7 @@ private:
     pair<int, int> tile_shield_offsets_w;
     int            tile_viewport_scale_w;
     int            tile_map_scale_w;
+    char32_t cset_override_w[NUM_DCHAR_TYPES];
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -647,6 +647,7 @@ public:
     const pair<int, int> &tile_shield_offsets = tile_shield_offsets_w;
     const int &tile_viewport_scale = tile_viewport_scale_w;
     const int &tile_map_scale = tile_map_scale_w;
+    const char32_t * const cset_override = cset_override_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -679,7 +680,6 @@ private:
 
     void clear_feature_overrides();
     void clear_cset_overrides();
-    void add_cset_override(dungeon_char_type dc, int symbol);
     void add_feature_override(const string &, bool prepend);
     void remove_feature_override(const string &, bool prepend);
 
@@ -699,6 +699,7 @@ private:
     void set_fire_order_spell(const string &s, bool append, bool remove);
     void set_fire_order_ability(const string &s, bool append, bool remove);
     void set_menu_sort(string field);
+    string set_display_char(vector<string>&fields);
     void str_to_enemy_hp_colour(const string &, bool);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
@@ -733,7 +734,6 @@ private:
     map<string, GameOption*> build_options_map(const vector<GameOption*> &opts);
 };
 
-char32_t get_glyph_override(int c);
 object_class_type item_class_by_sym(char32_t c);
 
 #ifdef DEBUG_GLOBALS

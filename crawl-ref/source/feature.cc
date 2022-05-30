@@ -6,6 +6,7 @@
 #include "libutil.h"
 #include "options.h"
 #include "player.h"
+#include "unicode.h"
 #include "viewchar.h"
 
 #include "feature-data.h"
@@ -13,6 +14,18 @@
 static FixedVector<feature_def, NUM_SHOW_ITEMS> item_defs;
 static int feat_index[NUM_FEATURES];
 static feature_def invis_fd, cloud_fd;
+
+static char32_t _get_glyph_override(int c)
+{
+    if (c < 0)
+        c = -c;
+    if (wcwidth(c) != 1)
+    {
+        mprf(MSGCH_ERROR, "Invalid glyph override: %X", c);
+        c = 0;
+    }
+    return c;
+}
 
 /** What symbol should be used for this feature?
  *
@@ -23,7 +36,7 @@ char32_t feature_def::symbol() const
 {
     auto over = map_find(Options.feature_symbol_overrides, feat);
     if (over && (*over)[0])
-        return get_glyph_override((*over)[0]);
+        return _get_glyph_override((*over)[0]);
 
     return dchar_glyph(dchar);
 }
@@ -38,7 +51,7 @@ char32_t feature_def::magic_symbol() const
 {
     auto over = map_find(Options.feature_symbol_overrides, feat);
     if (over && (*over)[1])
-        return get_glyph_override((*over)[1]);
+        return _get_glyph_override((*over)[1]);
 
     if (magic_dchar != NUM_DCHAR_TYPES)
         return dchar_glyph(magic_dchar);

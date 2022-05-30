@@ -303,6 +303,51 @@ private:
     colour_thresholds default_value;
 };
 
+// ListGameOption with a custom "set" function which can fail, rather than
+// A = B, which should not.
+//
+class CustomListGameOption : public GameOption
+{
+public:
+    CustomListGameOption(string (game_options::*_set)(vector<string>&),
+                         void (*_convert_ltyp)(rc_line_type&),
+                         vector<string> _names, game_options *_caller,
+                         string _default_value = "",
+                         string _separator = ",")
+        : GameOption(_names), set(_set), convert_ltyp(_convert_ltyp),
+          caller(_caller), default_value(_default_value), separator(_separator)
+        { }
+
+    CustomListGameOption(string (game_options::*_set)(vector<string>&),
+                         vector<string> _names, game_options *_caller,
+                         string _default_value = "",
+                         string _separator = ",")
+    : CustomListGameOption(_set, [](rc_line_type&){}, _names, _caller,
+                           _default_value, _separator) { }
+
+    void reset() override
+    {
+        loadFromString_real(default_value, RCFILE_LINE_EQUALS);
+        GameOption::reset();
+    }
+
+    string loadFromString(const string &field, rc_line_type ltyp) override;
+
+    const string str() const override
+    {
+        return join_strings(value.begin(), value.end(), separator);
+    }
+    bool load_from_UI() override;
+
+private:
+    string loadFromString_real(const string &field, rc_line_type ltyp);
+    string (game_options::*set)(vector<string>&);
+    void (*convert_ltyp)(rc_line_type&);
+    game_options *caller;
+    vector<string> value;
+    string default_value, separator;
+};
+
 // T must be convertible to a string, and support the << operator.
 template<typename T>
 class ListGameOption : public GameOption

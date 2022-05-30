@@ -380,3 +380,139 @@ const string ColourThresholdOption::str() const
     };
     return comma_separated_fn(value.begin(), value.end(), f, ", ");
 }
+
+// Load a string using the provided rc_line_type. This is called internally.
+string CustomListGameOption::loadFromString_real(const string &field,
+                                                 rc_line_type ltyp)
+{
+    vector<string> new_value, new_entries;
+    if (ltyp != RCFILE_LINE_EQUALS)
+        new_value = value;
+
+    for (const auto &part : split_string(separator, field))
+    {
+        if (part.empty())
+            continue;
+
+        if (ltyp == RCFILE_LINE_MINUS)
+            new_entries.emplace_back(" "+part);
+        else
+            new_entries.emplace_back(part);
+    }
+    merge_lists(new_value, new_entries, ltyp == RCFILE_LINE_CARET);
+    string error = (caller->*set)(new_value);
+    if (error.empty())
+        error = GameOption::loadFromString(field, ltyp);
+    if (error.empty())
+        value = new_value;
+    return error;
+}
+
+// Load a string, interpreting the rc_line_type according to the rules for this
+// option. This is used when loading options from an external file.
+string CustomListGameOption::loadFromString(const string &field,
+                                            rc_line_type ltyp)
+{
+    convert_ltyp(ltyp);
+    return loadFromString_real(field, ltyp);
+}
+
+// Every MenuEntry must be selectable, and must be backed by an entry in
+// CustomListGameOption::value.
+class CLGO_Menu : public Menu
+{
+public:
+    bool changed = false;
+
+    CLGO_Menu(int _flags, vector<string> &_list)
+        : Menu(_flags), list(_list) { reset_items(); }
+
+    int pre_process(int key) override
+    {
+        if ('(' == key && last_hovered) // move item up the list
+        {
+            int other = last_hovered-1;
+            swap(list[last_hovered], list[other]);
+            reset_items();
+            changed = true;
+            key = CK_UP;
+        }
+        else if (')' == key && last_hovered != (int)items.size()-1) // down
+        {
+            int other = last_hovered+1;
+            swap(list[last_hovered], list[other]);
+            reset_items();
+            changed = true;
+            key = CK_DOWN;
+        }
+        else if ('+' == key) // add an item
+        {
+            list.insert(list.begin()+last_hovered, string());
+            reset_items();
+            changed = true;
+            key = CK_ENTER;
+        }
+        else if (CK_BKSP == key || CK_DELETE == key || '-' == key)
+            key = CK_ENTER; // sorry, no 1 key delete without an undelete.
+        return key;
+    }
+
+private:
+
+    void reset_items()
+    {
+        clear();
+
+        for (unsigned i = 0, size = list.size(); i < size; ++i)
+        {
+            const char letter = index_to_letter(i % 52);
+            MenuEntry* entry = new MenuEntry(list[i], MEL_ITEM, 1, letter);
+            entry->data = &list[i];
+            add_entry(entry);
+        }
+        update_menu(true);
+    }
+
+    vector<string> &list;
+};
+
+bool CustomListGameOption::load_from_UI()
+{
+    string prompt = string("Select a line to edit for ")+name()+":";
+
+    CLGO_Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
+                   | MF_ALLOW_FORMATTING | MF_INIT_HOVER, value);
+    menu.set_title(new MenuEntry(prompt, MEL_TITLE));
+    const string more = "<lightgrey>Press <w>(</w> or <w>)</w> to move a line up"
+                        " or down or <w>+</w> to insert a line.</lightgrey>";
+    menu.set_more(formatted_string::parse_string(more));
+
+    menu.on_single_selection = [this, &menu](const MenuEntry &entry)
+    {
+        auto *option_text = static_cast<string*>(entry.data);
+        char select[1024];
+        string old = entry.text;
+        while (1)
+        {
+            if (msgwin_get_line("Enter a new value.", select,
+                                sizeof(select), nullptr, *option_text))
+            {
+                *option_text = entry.text;
+                this->loadFromString_real(this->str(), RCFILE_LINE_EQUALS);
+                return true;
+            }
+            *option_text = select;
+            string error
+                = this->loadFromString_real(this->str(), RCFILE_LINE_EQUALS);
+            if (error.empty())
+            {
+                const_cast<MenuEntry*>(&entry)->text = select;
+                return menu.changed = true;
+            }
+            show_type_response(error);
+        }
+    };
+
+    vector<MenuEntry*> sel = menu.show();
+    return menu.changed;
+}

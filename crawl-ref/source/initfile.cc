@@ -127,6 +127,15 @@ static void _dirty_prefs(game_options *caller)
     caller->prefs_dirty = true;
 }
 
+// Handle CustomListGameOptions which don't treat +=, -=, ^= and = in the same
+// way as ListGameOption, i.e. += adds to the end, -= removes matching lines,
+// ^= adds to the start, preserving order (so a,b ^= c,d is c,d,a,b) and = sets.
+
+static void _rcfile_plus_only(rc_line_type &rc)
+{
+    rc = RCFILE_LINE_PLUS;
+}
+
 const vector<GameOption*> game_options::build_options_list()
 {
 #ifndef DEBUG
@@ -543,6 +552,8 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
         new MultipleChoiceGameOption<char_set_type>(SIMPLE_NAME(char_set),
             CSET_DEFAULT, {{"ascii", CSET_ASCII}, {"default", CSET_DEFAULT}}),
+        new CustomListGameOption(&game_options::set_display_char,
+                                 _rcfile_plus_only, {"display_char"}, this),
         new BoolGameOption(SIMPLE_NAME(use_fake_player_cursor), true),
         new BoolGameOption(SIMPLE_NAME(show_player_species), false),
         new BoolGameOption(SIMPLE_NAME(use_modifier_prefix_keys), true),
@@ -1375,8 +1386,6 @@ void game_options::reset_options()
     message_colour_mappings.clear();
     named_options.clear();
 
-    clear_cset_overrides();
-
     clear_feature_overrides();
     mon_glyph_overrides.clear();
     item_glyph_overrides.clear();
@@ -1398,25 +1407,13 @@ void game_options::reset_options()
 
 void game_options::clear_cset_overrides()
 {
-    memset(cset_override, 0, sizeof cset_override);
+    memset(cset_override_w, 0, sizeof cset_override_w);
 }
 
 void game_options::clear_feature_overrides()
 {
     feature_colour_overrides.clear();
     feature_symbol_overrides.clear();
-}
-
-char32_t get_glyph_override(int c)
-{
-    if (c < 0)
-        c = -c;
-    if (wcwidth(c) != 1)
-    {
-        mprf(MSGCH_ERROR, "Invalid glyph override: %X", c);
-        c = 0;
-    }
-    return c;
 }
 
 static int read_symbol(string s)
@@ -1445,6 +1442,79 @@ static int read_symbol(string s)
 
     char *tail;
     return strtoul(s.c_str(), &tail, base);
+}
+
+// Returns false if str does not contain a width 1 character, or if it also
+// contains junk characters.
+// Return true and set *sym (if provided) to the character otherwise.
+static bool _read_symbol(string str, char32_t *sym = nullptr)
+{
+    char32_t unused[1], c;
+    if (!sym)
+        sym = unused;
+
+    if (str.empty())
+        return false;
+
+    if (str.length() > 1 && str[0] == '\\')
+        str = str.substr(1);
+
+    const char *nc = str.c_str();
+    nc += utf8towc(&c, nc);
+    // no control, combining or CJK characters, please
+    if (!*nc && wcwidth(c) == 1)
+    {
+        *sym = c;
+        return true;
+    }
+
+    int base = 10;
+    if (str.length() > 1 && str[0] == 'x')
+    {
+        str = str.substr(1);
+        base = 16;
+    }
+
+    char *tail;
+    auto ret = strtoul(str.c_str(), &tail, base);
+    if (*tail || wcwidth(ret) != 1)
+        return false;
+    *sym = ret;
+    return true;
+}
+
+string game_options::set_display_char(vector<string>&fields)
+{
+    vector<string> error;
+
+    clear_cset_overrides();
+    for (const string &field : fields)
+    {
+        auto offset = field.rfind(':');
+        if (field.npos == offset)
+        {
+            error.push_back("No : in \""+field+"\"");
+            continue;
+        }
+        dungeon_char_type dc = dchar_by_name(field.substr(0, offset));
+           if (dc == NUM_DCHAR_TYPES)
+        {
+            auto f = field.substr(0, offset);
+            error.push_back("Invalid dungeon character \""+f+"\"");
+            continue;
+        }
+        auto *sym = &cset_override_w[dc];
+        string f = field.substr(offset+1);
+        if (!_read_symbol(f, sym))
+            error.push_back("Invalid character code \""+f+"\"");
+    }
+    if (error.empty())
+    {
+        init_char_table(Options.char_set);
+        return "";
+    }
+    string list = comma_separated_line(error.begin(), error.end());
+    return "(display_char) "+list;
 }
 
 void game_options::set_fire_order_ability(const string &s, bool append, bool remove)
@@ -1813,11 +1883,6 @@ void game_options::add_feature_override(const string &text, bool /*prepend*/)
         COL(6, seen_em_dcolour);
 #undef COL
     }
-}
-
-void game_options::add_cset_override(dungeon_char_type dc, int symbol)
-{
-    cset_override[dc] = get_glyph_override(symbol);
 }
 
 string find_crawlrc()
@@ -3152,22 +3217,8 @@ void game_options::read_option_line(const string &str, bool runscript)
                                plus_equal || caret_equal,
                                minus_equal);
     }
-    else if (key == "display_char"
-             || starts_with(key, "cset")) // compatibility with old rcfiles
-    {
-        for (const string &over : split_string(",", field))
-        {
-            vector<string> mapping = split_string(":", over);
-            if (mapping.size() != 2)
-                continue;
-
-            dungeon_char_type dc = dchar_by_name(mapping[0]);
-            if (dc == NUM_DCHAR_TYPES)
-                continue;
-
-            add_cset_override(dc, read_symbol(mapping[1]));
-        }
-    }
+    else if (starts_with(key, "cset")) // compatibility with old rcfiles
+        read_option_line("display_char += "+field, runscript);
     else if (key == "feature" || key == "dungeon")
     {
         if (plain)
