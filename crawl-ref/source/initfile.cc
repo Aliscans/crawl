@@ -383,6 +383,9 @@ const vector<GameOption*> game_options::build_options_list()
                                  _rcfile_no_minus, {"fire_order"}, this,
                                  "launcher,throwing,inscribed,spell"
                                   ",evokable,ability"),
+        new CustomListGameOption(&game_options::set_fire_order_spell,
+                                 _rcfile_no_caret, {"fire_order_spell"}, this,
+                                 "all"),
         new IntGameOption(SIMPLE_NAME(fail_severity_to_quiver), 3, -1, 5),
         new BoolGameOption(SIMPLE_NAME(launcher_autoquiver), true),
         (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
@@ -1284,7 +1287,6 @@ void game_options::reset_options()
     flush_input[ FLUSH_LUA ]            = true;
 
     // Clear fire_order and set up the defaults.
-    set_fire_order_spell("all", false, false);
     set_fire_order_ability("all", false, false);
 
     fire_order_ability.erase(ABIL_TROG_BERSERK);
@@ -1633,49 +1635,46 @@ void game_options::set_fire_order_ability(const string &s, bool append, bool rem
     }
 }
 
-void game_options::set_fire_order_spell(const string &s, bool append, bool remove)
+string game_options::set_fire_order_spell(vector<string> &fields)
 {
     if (!spell_data_initialized()) // not ready in the first read
-        return;
-    if (!append && !remove)
-        fire_order_spell.clear();
-    if (s == "all")
+        return "";
+    vector<string> errors;
+    fire_order_spell_w.clear();
+    for (string field : fields)
     {
-        if (remove)
-            fire_order_ability.clear();
-        else
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        if (field == "all" && remove)
+            fire_order_spell_w.clear();
+        else if (field == "all" || field == "attack")
+        {
+            auto filter = field == "all" ? is_valid_spell
+                                         : quiver::is_autofight_combat_spell;
             for (int i = SPELL_NO_SPELL; i < NUM_SPELLS; i++)
-                if (is_valid_spell(static_cast<spell_type>(i)))
-                    fire_order_spell.insert(static_cast<spell_type>(i));
-        return;
-    }
-    if (s == "attack")
-    {
-        for (int i = SPELL_NO_SPELL; i < NUM_SPELLS; i++)
-        {
-            auto sp = static_cast<spell_type>(i);
-            if (quiver::is_autofight_combat_spell(sp))
-                if (remove)
-                    fire_order_spell.erase(sp);
-                else
-                    fire_order_spell.insert(sp);
-        }
-        return;
-    }
-    vector<string> slots = split_string(",", s);
-    for (const string &slot : slots)
-    {
-        spell_type spell = spell_by_name(slot);
-        if (is_valid_spell(spell))
-        {
-            if (remove)
-                fire_order_spell.erase(spell);
-            else
-                fire_order_spell.insert(spell);
+            {
+                auto sp = static_cast<spell_type>(i);
+                bool matched = (*filter)(sp);
+                if (matched && remove)
+                    fire_order_spell_w.erase(sp);
+                else if (matched)
+                    fire_order_spell_w.insert(sp);
+            }
         }
         else
-            report_error("Unknown spell '%s'\n", slot.c_str());
+        {
+            spell_type spell = spell_by_name(field);
+            if (!is_valid_spell(spell))
+                return "Unknown spell \""+field+"\".";
+            else if (remove)
+                fire_order_spell_w.erase(spell);
+            else
+                fire_order_spell_w.insert(spell);
+            continue;
+        }
     }
+    return "";
 }
 
 string game_options::set_fire_order(vector<string> &fields)
@@ -3384,8 +3383,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.allowed_combos.clear();
         NEWGAME_OPTION(game.allowed_weapons, str_to_weapon, weapon_type);
     }
-    else if (key == "fire_order_spell" && runscript)
-        set_fire_order_spell(field, plus_equal || caret_equal, minus_equal);
     else if (key == "fire_order_ability" && runscript)
         set_fire_order_ability(field, plus_equal || caret_equal, minus_equal);
 #ifndef DGAMELAUNCH
