@@ -292,7 +292,6 @@ public:
     bool        action_panel_glyphs;
 #endif
 
-    vector<unsigned> fire_order;  // missile search order for 'f' command
     unordered_set<spell_type, hash<int>> fire_order_spell;
     unordered_set<ability_type, hash<int>> fire_order_ability;
     bool        quiver_menu_focus;
@@ -640,6 +639,7 @@ private:
     map<monster_type, cglyph_t> mon_glyph_overrides_w;
     typedef pair<string, cglyph_t> item_glyph_override_type;
     vector<item_glyph_override_type > item_glyph_overrides_w;
+    vector<unsigned> fire_order_w;  // missile search order for 'f' command
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -657,6 +657,7 @@ public:
         &mon_glyph_overrides = mon_glyph_overrides_w;
     const vector<item_glyph_override_type >
         &item_glyph_overrides = item_glyph_overrides_w;
+    const vector<unsigned> &fire_order = fire_order_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -703,8 +704,8 @@ private:
                                 const string &interrupt_names,
                                 bool append_interrupts,
                                 bool remove_interrupts);
-    void set_fire_order(const string &full, bool append, bool prepend);
-    void add_fire_order_slot(const string &s, bool prepend);
+    string set_fire_order(vector<string> &fields);
+    string add_fire_order_slot(const string &s);
     void set_fire_order_spell(const string &s, bool append, bool remove);
     void set_fire_order_ability(const string &s, bool append, bool remove);
     void set_menu_sort(string field);

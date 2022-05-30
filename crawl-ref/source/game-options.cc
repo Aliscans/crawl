@@ -432,8 +432,8 @@ class CLGO_Menu : public Menu
 public:
     bool changed = false;
 
-    CLGO_Menu(int _flags, vector<string> &_list)
-        : Menu(_flags), list(_list) { reset_items(); }
+    CLGO_Menu(int _flags, vector<string> &_list, bool _use_minus)
+        : Menu(_flags), list(_list), use_minus(_use_minus) { reset_items(); }
 
     int pre_process(int key) override
     {
@@ -460,7 +460,7 @@ public:
             changed = true;
             key = CK_ENTER;
         }
-        else if ('-' == key) // add a REMOVE item
+        else if ('-' == key && use_minus) // add a REMOVE item
         {
             list.insert(list.begin()+last_hovered, " ");
             reset_items();
@@ -496,6 +496,7 @@ public:
 private:
     const string dummy_string = "<h>Press + to set this option.</h>";
     vector<string> &list;
+    bool use_minus;
 };
 
 bool CustomListGameOption::load_from_UI()
@@ -503,11 +504,11 @@ bool CustomListGameOption::load_from_UI()
     string prompt = string("Select a line to edit for \"")+name()+"\":";
 
     CLGO_Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
-                   | MF_ALLOW_FORMATTING | MF_INIT_HOVER, value);
+                   | MF_ALLOW_FORMATTING | MF_INIT_HOVER, value, use_minus);
     menu.set_title(new MenuEntry(prompt, MEL_TITLE));
+    const string rem = use_minus ? "  [<w>-</w>] insert a REMOVE line" : "";
     const string more = "<lightgrey>[<w>(</w>] move up  [<w>)</w>] move down"
-                        "  [<w>+</w>] insert an ADD line"
-                        "  [<w>-</w>] insert a REMOVE line</lightgrey>";
+                        "  [<w>+</w>] insert an ADD line"+rem+"</lightgrey>";
     menu.set_more(formatted_string::parse_string(more));
 
     menu.on_single_selection = [this, &menu](const MenuEntry &entry)
@@ -554,4 +555,12 @@ bool CustomListGameOption::load_from_UI()
 
     vector<MenuEntry*> sel = menu.show();
     return menu.changed;
+}
+
+// Don't add REMOVE lines if loadFromString() doesn't take -= lines as they are.
+void CustomListGameOption::set_minus()
+{
+    auto r = RCFILE_LINE_MINUS;
+    convert_ltyp(r);
+    use_minus = RCFILE_LINE_MINUS == r;
 }

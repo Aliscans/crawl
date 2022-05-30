@@ -142,6 +142,12 @@ static void _rcfile_no_caret(rc_line_type &rc)
         rc = RCFILE_LINE_PLUS;
 }
 
+static void _rcfile_no_minus(rc_line_type &rc)
+{
+    if (rc == RCFILE_LINE_MINUS)
+        rc = RCFILE_LINE_EQUALS;
+}
+
 const vector<GameOption*> game_options::build_options_list()
 {
 #ifndef DEBUG
@@ -373,6 +379,10 @@ const vector<GameOption*> game_options::build_options_list()
         new GameOptionHeading("Interface: Quivers, firing, and ammo"),
         new CustomStringGameOption(&game_options::set_fire_items_start,
                                    {"fire_items_start"}, this, "a"),
+        new CustomListGameOption(&game_options::set_fire_order,
+                                 _rcfile_no_minus, {"fire_order"}, this,
+                                 "launcher,throwing,inscribed,spell"
+                                  ",evokable,ability"),
         new IntGameOption(SIMPLE_NAME(fail_severity_to_quiver), 3, -1, 5),
         new BoolGameOption(SIMPLE_NAME(launcher_autoquiver), true),
         (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
@@ -1274,8 +1284,6 @@ void game_options::reset_options()
     flush_input[ FLUSH_LUA ]            = true;
 
     // Clear fire_order and set up the defaults.
-    set_fire_order("launcher, throwing, inscribed, spell, evokable, ability",
-                   false, false);
     set_fire_order_spell("all", false, false);
     set_fire_order_ability("all", false, false);
 
@@ -1670,30 +1678,35 @@ void game_options::set_fire_order_spell(const string &s, bool append, bool remov
     }
 }
 
-void game_options::set_fire_order(const string &s, bool append, bool prepend)
+string game_options::set_fire_order(vector<string> &fields)
 {
-    if (!append && !prepend)
-        fire_order.clear();
-    vector<string> slots = split_string(",", s);
-    if (prepend)
-        reverse(slots.begin(), slots.end());
-    for (const string &slot : slots)
-        add_fire_order_slot(slot, prepend);
+    fire_order_w.clear();
+    vector<string> errors;;
+    for (const string &slot : fields)
+    {
+        string error = add_fire_order_slot(slot);
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(fire_order) "+list;
 }
 
-void game_options::add_fire_order_slot(const string &s, bool prepend)
+string game_options::add_fire_order_slot(const string &s)
 {
     unsigned flags = 0;
     for (const string &alt : split_string("/", s))
-        flags |= _str_to_fire_types(alt);
-
-    if (flags)
     {
-        if (prepend)
-            fire_order.insert(fire_order.begin(), flags);
-        else
-            fire_order.push_back(flags);
+        fire_type flag = _str_to_fire_types(alt);
+        if (FIRE_NONE == flag)
+            return "Unknown fire type \""+alt+"\".";
+        flags |= flag;
     }
+    if (flags)
+        fire_order_w.push_back(flags);
+    return "";
 }
 
 void game_options::add_force_spell_targeter(const string &s, bool)
@@ -3371,8 +3384,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.allowed_combos.clear();
         NEWGAME_OPTION(game.allowed_weapons, str_to_weapon, weapon_type);
     }
-    else if (key == "fire_order")
-        set_fire_order(field, plus_equal, caret_equal);
     else if (key == "fire_order_spell" && runscript)
         set_fire_order_spell(field, plus_equal || caret_equal, minus_equal);
     else if (key == "fire_order_ability" && runscript)

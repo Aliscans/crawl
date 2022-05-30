@@ -334,7 +334,7 @@ public:
                          string _separator = ",")
         : GameOption(_names), set(_set), convert_ltyp(_convert_ltyp),
           caller(_caller), default_value(_default_value), separator(_separator)
-        { }
+        { set_minus(); }
 
     CustomListGameOption(string (game_options::*_set)(vector<string>&),
                          vector<string> _names, game_options *_caller,
@@ -362,9 +362,11 @@ private:
                                bool trim = false);
     string (game_options::*set)(vector<string>&);
     void (*convert_ltyp)(rc_line_type&);
+    void set_minus();
     game_options *caller;
     vector<string> value;
     string default_value, separator;
+    bool use_minus;
 };
 
 // T must be convertible to a string, and support the << operator.
