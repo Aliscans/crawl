@@ -666,66 +666,69 @@ int element_colour(int element, bool no_random, const coord_def& loc)
 }
 
 #ifdef USE_TILE
-static int _hex(char c)
+/// Extract a colour from a string.
+///
+/// @param vcol[out] Set to the VColour version of colour, if valid.
+/// @param colour[in] String containing the name of a colour.
+///
+/// @returns true (and sets vcol) if colour can be parsed, false otherwise.
+bool str_to_tile_colour(VColour &vcol, string colour)
 {
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'a' && c <= 'f')
-        return 10 + c - 'a';
-    if (c >= 'A' && c <= 'F')
-        return 10 + c - 'A';
-    return 0;
-}
-
-VColour str_to_tile_colour(string colour)
-{
-    if (colour.empty())
-        return VColour(0, 0, 0);
-
+    static map<string, long> colour_map =
+    {
+        {"black", 0x000000},
+        {"darkgrey", 0x808080}, {"darkgray", 0x808080},
+        {"grey", 0xA0A0A0}, {"gray", 0xA0A0A0},
+        {"lightgrey", 0xC0C0C0}, {"lightgray", 0xC0C0C0},
+        {"white", 0xFFFFFF},
+        {"blue", 0x0040FF},
+        {"lightblue", 0x8080FF},
+        {"darkblue", 0x002080},
+        {"green", 0x00FF00},
+        {"lightgreen", 0x80FF80},
+        {"darkgreen", 0x008000},
+        {"cyan", 0x00FFFF},
+        {"lightcyan", 0x40FFFF},
+        {"darkcyan", 0x008080},
+        {"red", 0xFF0000},
+        {"lightred", 0xFF8080},
+        {"darkred", 0x800000},
+        {"magenta", 0xC000FF},
+        {"lightmagenta", 0xFF80FF},
+        {"darkmagenta", 0x600080},
+        {"yellow", 0xFFFF00},
+        {"lightyellow", 0xFFFF40},
+        {"darkyellow", 0x808000},
+        {"brown", 0xA55B00},
+    };
+    long col;
     if (colour[0] == '#' && colour.length() == 7)
     {
-        return VColour((_hex(colour[1]) << 4) + _hex(colour[2]),
-                (_hex(colour[3]) << 4) + _hex(colour[4]),
-                (_hex(colour[5]) << 4) + _hex(colour[6]));
+        char *end;
+        col = strtol(colour.c_str()+1, &end, 16);
+        if (col < 0 || *end) // Didn't convert all 6 digits.
+            return false;
     }
     else
     {
-        lowercase(colour);
-
-        if (colour == "darkgray")
-            colour = "darkgrey";
-        else if (colour == "gray")
-            colour = "grey";
-        else if (colour == "lightgray")
-            colour = "lightgrey";
-
-        if (colour == "black")             return VColour(  0,   0,   0);
-        else if (colour == "darkgrey")     return VColour(128, 128, 128);
-        else if (colour == "grey")         return VColour(160, 160, 160);
-        else if (colour == "lightgrey")    return VColour(192, 192, 192);
-        else if (colour == "white")        return VColour(255, 255, 255);
-        else if (colour == "blue")         return VColour(  0,  64, 255);
-        else if (colour == "lightblue")    return VColour(128, 128, 255);
-        else if (colour == "darkblue")     return VColour(  0,  32, 128);
-        else if (colour == "green")        return VColour(  0, 255,   0);
-        else if (colour == "lightgreen")   return VColour(128, 255, 128);
-        else if (colour == "darkgreen")    return VColour(  0, 128,   0);
-        else if (colour == "cyan")         return VColour(  0, 255, 255);
-        else if (colour == "lightcyan")    return VColour( 64, 255, 255);
-        else if (colour == "darkcyan")     return VColour(  0, 128, 128);
-        else if (colour == "red")          return VColour(255,   0,   0);
-        else if (colour == "lightred")     return VColour(255, 128, 128);
-        else if (colour == "darkred")      return VColour(128,   0,   0);
-        else if (colour == "magenta")      return VColour(192,   0, 255);
-        else if (colour == "lightmagenta") return VColour(255, 128, 255);
-        else if (colour == "darkmagenta")  return VColour( 96,   0, 128);
-        else if (colour == "yellow")       return VColour(255, 255,   0);
-        else if (colour == "lightyellow")  return VColour(255, 255,  64);
-        else if (colour == "darkyellow")   return VColour(128, 128,   0);
-        else if (colour == "brown")        return VColour(165,  91,   0);
-        else return VColour(0, 0, 0);
+        const auto &p = colour_map.find(lowercase(colour));
+        if (colour_map.end() == p)
+            return false;
+        else
+            col = p->second;
     }
+    vcol = VColour(col/256/256, col/256%256, col%256);
+    return true;
 }
+
+// Returns the colour. Returns black for any errors.
+VColour str_to_tile_colour(string colour)
+{
+    VColour vcol(0, 0, 0);
+    str_to_tile_colour(vcol, colour);
+    return vcol;
+}
+
 #endif
 
 static const char* const cols[16] =

@@ -20,6 +20,7 @@ static inline bool is_tiles() { return false; }
 #endif
 
 #ifdef USE_TILE
+bool str_to_tile_colour(VColour &vcol, string colour);
 VColour str_to_tile_colour(string colour); // in colour.cc
 
 // in item-use.cc

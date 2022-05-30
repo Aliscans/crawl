@@ -110,7 +110,8 @@ TileColGameOption::TileColGameOption(VColour &val, std::set<std::string> _names,
 
 string TileColGameOption::loadFromString(const string &field, rc_line_type ltyp)
 {
-    value = str_to_tile_colour(field);
+    if (!str_to_tile_colour(value, field))
+        return make_stringf("Bad %s -- %s\n", name().c_str(), field.c_str());
     return GameOption::loadFromString(field, ltyp);
 }
 #endif
