@@ -13,6 +13,7 @@
 #include "colour.h"
 #include "stringutil.h"
 #include "maybe-bool.h"
+#include "menu.h"
 #include "unwind.h"
 
 using std::vector;
@@ -38,6 +39,23 @@ L& remove_matching(L& lis, const E& entry)
     lis.erase(remove(lis.begin(), lis.end(), entry), lis.end());
     return lis;
 }
+
+// Like MenuEntry, but only parse menu colours for the first _highlight_until
+// characters of each line (in this case, the option name but not its value).
+class EGP_MenuEntry : public MenuEntry
+{
+public:
+    EGP_MenuEntry(const string &txt = string(), MenuEntryLevel lev = MEL_ITEM,
+                  int qty = 0, int hotk = 0, int _highlight_until = INT_MAX)
+        : MenuEntry(txt, lev, qty, hotk), highlight_until(_highlight_until) { }
+
+    int highlight_colour() const override
+    {
+        return menu_colour(text.substr(0, highlight_until), "", tag);
+    }
+private:
+    int highlight_until;
+};
 
 class GameOption
 {
@@ -340,7 +358,8 @@ public:
     bool load_from_UI() override;
 
 private:
-    string loadFromString_real(const string &field, rc_line_type ltyp);
+    string loadFromString_real(const string &field, rc_line_type ltyp,
+                               bool trim = false);
     string (game_options::*set)(vector<string>&);
     void (*convert_ltyp)(rc_line_type&);
     game_options *caller;

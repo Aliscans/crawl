@@ -383,13 +383,13 @@ const string ColourThresholdOption::str() const
 
 // Load a string using the provided rc_line_type. This is called internally.
 string CustomListGameOption::loadFromString_real(const string &field,
-                                                 rc_line_type ltyp)
+                                                 rc_line_type ltyp, bool trim)
 {
     vector<string> new_value, new_entries;
     if (ltyp != RCFILE_LINE_EQUALS)
         new_value = value;
 
-    for (const auto &part : split_string(separator, field))
+    for (const auto &part : split_string(separator, field, trim))
     {
         if (part.empty())
             continue;
@@ -414,7 +414,15 @@ string CustomListGameOption::loadFromString(const string &field,
                                             rc_line_type ltyp)
 {
     convert_ltyp(ltyp);
-    return loadFromString_real(field, ltyp);
+    return loadFromString_real(field, ltyp, true);
+}
+
+static string _make_clgo_title(string val)
+{
+    string item_title = replace_all(val, "<", "<<");
+    if (' ' == val[0])
+        return "<h>REMOVE</h>"+item_title;
+    return item_title;
 }
 
 // Every MenuEntry must be selectable, and must be backed by an entry in
@@ -452,12 +460,17 @@ public:
             changed = true;
             key = CK_ENTER;
         }
-        else if (CK_BKSP == key || CK_DELETE == key || '-' == key)
+        else if ('-' == key) // add a REMOVE item
+        {
+            list.insert(list.begin()+last_hovered, " ");
+            reset_items();
+            changed = true;
+            key = CK_ENTER;
+        }
+        else if (CK_BKSP == key || CK_DELETE == key)
             key = CK_ENTER; // sorry, no 1 key delete without an undelete.
         return key;
     }
-
-private:
 
     void reset_items()
     {
@@ -466,50 +479,76 @@ private:
         for (unsigned i = 0, size = list.size(); i < size; ++i)
         {
             const char letter = index_to_letter(i % 52);
-            MenuEntry* entry = new MenuEntry(list[i], MEL_ITEM, 1, letter);
+            string item_title = _make_clgo_title(list[i]);
+            MenuEntry* entry = new EGP_MenuEntry(item_title, MEL_ITEM, 1,
+                                                 letter, 5);
             entry->data = &list[i];
             add_entry(entry);
+        }
+        if (!list.size()) // The user can't add to a blank list.
+        {
+            add_entry(new MenuEntry(dummy_string, 0,
+                                    [](const MenuEntry&){return true;}));
         }
         update_menu(true);
     }
 
+private:
+    const string dummy_string = "<h>Press + to set this option.</h>";
     vector<string> &list;
 };
 
 bool CustomListGameOption::load_from_UI()
 {
-    string prompt = string("Select a line to edit for ")+name()+":";
+    string prompt = string("Select a line to edit for \"")+name()+"\":";
 
     CLGO_Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
                    | MF_ALLOW_FORMATTING | MF_INIT_HOVER, value);
     menu.set_title(new MenuEntry(prompt, MEL_TITLE));
-    const string more = "<lightgrey>Press <w>(</w> or <w>)</w> to move a line up"
-                        " or down or <w>+</w> to insert a line.</lightgrey>";
+    const string more = "<lightgrey>[<w>(</w>] move up  [<w>)</w>] move down"
+                        "  [<w>+</w>] insert an ADD line"
+                        "  [<w>-</w>] insert a REMOVE line</lightgrey>";
     menu.set_more(formatted_string::parse_string(more));
 
     menu.on_single_selection = [this, &menu](const MenuEntry &entry)
     {
         auto *option_text = static_cast<string*>(entry.data);
+        unsigned remove = ' ' == option_text->c_str()[0] ? 1 : 0;
+        const string verb = remove ? "remove" : "add";
         char select[1024];
-        string old = entry.text;
+        string old = option_text->substr(remove), last = old;
         while (1)
         {
-            if (msgwin_get_line("Enter a new value.", select,
-                                sizeof(select), nullptr, *option_text))
+            if (msgwin_get_line("Enter a value to "+verb+".",
+                                select, sizeof(select), nullptr, last))
             {
-                *option_text = entry.text;
+                if (!old.empty() && remove)
+                    *option_text = " "+old;
+                else
+                    *option_text = old;
                 this->loadFromString_real(this->str(), RCFILE_LINE_EQUALS);
+                if (old.empty())
+                    menu.reset_items();
                 return true;
             }
-            *option_text = select;
+            *option_text = trimmed_string(select);
+            bool blank = option_text->empty();
+            if (remove && !blank)
+                option_text->insert(0, " ");
             string error
                 = this->loadFromString_real(this->str(), RCFILE_LINE_EQUALS);
             if (error.empty())
             {
-                const_cast<MenuEntry*>(&entry)->text = select;
-                return menu.changed = true;
+                auto &text = const_cast<MenuEntry*>(&entry)->text;
+                if (blank)
+                    menu.reset_items();
+                else
+                    text = _make_clgo_title(*option_text);
+                menu.changed = true;
+                return true;
             }
             show_type_response(error);
+            last = select;
         }
     };
 

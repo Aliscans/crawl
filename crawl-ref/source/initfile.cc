@@ -136,6 +136,12 @@ static void _rcfile_plus_only(rc_line_type &rc)
     rc = RCFILE_LINE_PLUS;
 }
 
+static void _rcfile_no_caret(rc_line_type &rc)
+{
+    if (rc == RCFILE_LINE_CARET)
+        rc = RCFILE_LINE_PLUS;
+}
+
 const vector<GameOption*> game_options::build_options_list()
 {
 #ifndef DEBUG
@@ -554,6 +560,8 @@ const vector<GameOption*> game_options::build_options_list()
             CSET_DEFAULT, {{"ascii", CSET_ASCII}, {"default", CSET_DEFAULT}}),
         new CustomListGameOption(&game_options::set_display_char,
                                  _rcfile_plus_only, {"display_char"}, this),
+        new CustomListGameOption(&game_options::set_feature, _rcfile_no_caret,
+                                 {"feature"}, this, {}, ";"),
         new BoolGameOption(SIMPLE_NAME(use_fake_player_cursor), true),
         new BoolGameOption(SIMPLE_NAME(show_player_species), false),
         new BoolGameOption(SIMPLE_NAME(use_modifier_prefix_keys), true),
@@ -1386,7 +1394,6 @@ void game_options::reset_options()
     message_colour_mappings.clear();
     named_options.clear();
 
-    clear_feature_overrides();
     mon_glyph_overrides.clear();
     item_glyph_overrides.clear();
     item_glyph_cache.clear();
@@ -1412,8 +1419,8 @@ void game_options::clear_cset_overrides()
 
 void game_options::clear_feature_overrides()
 {
-    feature_colour_overrides.clear();
-    feature_symbol_overrides.clear();
+    feature_colour_overrides_w.clear();
+    feature_symbol_overrides_w.clear();
 }
 
 static int read_symbol(string s)
@@ -1515,6 +1522,26 @@ string game_options::set_display_char(vector<string>&fields)
     }
     string list = comma_separated_line(error.begin(), error.end());
     return "(display_char) "+list;
+}
+
+string game_options::set_feature(vector<string> &fields)
+{
+    clear_feature_overrides();
+    vector<string> errors;
+    for (const string &field : fields)
+    {
+        string error;
+        if (field[0] == ' ')
+            error = remove_feature_override(field.substr(1));
+        else
+            error = add_feature_override(field);
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(feature) "+list;
 }
 
 void game_options::set_fire_order_ability(const string &s, bool append, bool remove)
@@ -1817,7 +1844,7 @@ void game_options::add_item_glyph_override(const string &text, bool prepend)
     }
 }
 
-void game_options::remove_feature_override(const string &text, bool /*prepend*/)
+string game_options::remove_feature_override(const string &text)
 {
     string fname;
     string::size_type epos = text.rfind("}");
@@ -1829,60 +1856,72 @@ void game_options::remove_feature_override(const string &text, bool /*prepend*/)
     trim_string(fname);
 
     vector<dungeon_feature_type> feats = features_by_desc(text_pattern(fname));
+    if (feats.empty())
+        return "No features match the pattern";
+
     for (dungeon_feature_type f : feats)
     {
-        feature_colour_overrides.erase(f);
-        feature_symbol_overrides.erase(f);
+        feature_colour_overrides_w.erase(f);
+        feature_symbol_overrides_w.erase(f);
     }
+    return "";
 }
 
-void game_options::add_feature_override(const string &text, bool /*prepend*/)
+string game_options::add_feature_override(const string &text)
 {
     string::size_type epos = text.rfind("}");
     if (epos == string::npos)
-        return;
+        return "Missing }";
 
     string::size_type spos = text.rfind("{", epos);
     if (spos == string::npos)
-        return;
+        return "Missing {";
 
-    string fname = text.substr(0, spos);
+    text_pattern fname = trimmed_string(text.substr(0, spos));
     string props = text.substr(spos + 1, epos - spos - 1);
     vector<string> iprops = split_string(",", props, true, true);
 
-    if (iprops.size() < 1 || iprops.size() > 7)
-        return;
+    if (iprops.size() > 7)
+        return "Too many fields";
 
-    if (iprops.size() < 7)
-        iprops.resize(7);
+    iprops.resize(7);
+    vector<dungeon_feature_type> feats = features_by_desc(fname);
+    if (feats.empty() && get_feature_def(DNGN_FLOOR).feat == DNGN_FLOOR)
+        return "No features match the pattern";
 
-    trim_string(fname);
-    vector<dungeon_feature_type> feats = features_by_desc(text_pattern(fname));
-    if (feats.empty())
-        return;
+    FixedVector<char32_t, 2> sym_tmp = 0;
+    colour_t col_tmp[5] = {};
+
+    for (int n = 0; n < 7; ++n)
+    {
+        char32_t s;
+        if (iprops[n].empty())
+            ;
+        else if (n < 2 && _read_symbol(iprops[n], &s))
+            sym_tmp[n] = s;
+        else if (n < 2)
+            return "Unrecognised symbol \""+iprops[n]+"\".";
+        else if (colour_t c = str_to_colour(iprops[n], BLACK))
+            col_tmp[n-2] = c;
+        else
+            return "Unrecognised colour \""+iprops[n]+"\".";
+    }
 
     for (const dungeon_feature_type feat : feats)
     {
         if (feat >= NUM_FEATURES)
             continue; // TODO: handle other object types.
 
-#define SYM(n, field) if (char32_t s = read_symbol(iprops[n])) \
-                          feature_symbol_overrides[feat][n] = s; \
-                      else \
-                          feature_symbol_overrides[feat][n] = '\0';
-        SYM(0, symbol);
-        SYM(1, magic_symbol);
-#undef SYM
-        feature_def &fov(feature_colour_overrides[feat]);
-#define COL(n, field) if (colour_t c = str_to_colour(iprops[n], BLACK)) \
-                          fov.field = c;
-        COL(2, dcolour);
-        COL(3, unseen_dcolour);
-        COL(4, seen_dcolour);
-        COL(5, em_dcolour);
-        COL(6, seen_em_dcolour);
-#undef COL
+        feature_symbol_overrides_w[feat] = sym_tmp;
+        feature_def &fov(feature_colour_overrides_w[feat]);
+        colour_t *col_dest[5] = {&fov.dcolour, &fov.unseen_dcolour,
+                                 &fov.seen_dcolour, &fov.em_dcolour,
+                                 &fov.seen_em_dcolour};
+        for (int n = 0; n < 5; ++n)
+            if (col_tmp[n])
+                *(col_dest[n]) = col_tmp[n];
     }
+    return "";
 }
 
 string find_crawlrc()
@@ -2285,6 +2324,7 @@ void game_options::reset_aliases(bool clear)
     Options.add_alias("heap_brand", "heap_highlight");
     Options.add_alias("feature_item_brand", "feature_item_highlight");
     Options.add_alias("trap_item_brand", "trap_item_highlight");
+    Options.add_alias("dungeon", "feature");
 
 }
 
@@ -3219,16 +3259,6 @@ void game_options::read_option_line(const string &str, bool runscript)
     }
     else if (starts_with(key, "cset")) // compatibility with old rcfiles
         read_option_line("display_char += "+field, runscript);
-    else if (key == "feature" || key == "dungeon")
-    {
-        if (plain)
-           clear_feature_overrides();
-
-        if (minus_equal)
-            split_parse(field, ";", &game_options::remove_feature_override);
-        else
-            split_parse(field, ";", &game_options::add_feature_override);
-    }
     else if (key == "mon_glyph")
     {
         if (plain)
@@ -5666,23 +5696,6 @@ bool parse_args(int argc, char **argv, bool rc_only)
 
     return true;
 }
-
-// Like MenuEntry, but only parse menu colours for the first _highlight_until
-// characters of each line (in this case, the option name but not its value).
-class EGP_MenuEntry : public MenuEntry
-{
-public:
-    EGP_MenuEntry(const string &txt = string(), MenuEntryLevel lev = MEL_ITEM,
-                  int qty = 0, int hotk = 0, int _highlight_until = INT_MAX)
-        : MenuEntry(txt, lev, qty, hotk), highlight_until(_highlight_until) { }
-
-    int highlight_colour() const override
-    {
-        return menu_colour(text.substr(0, highlight_until), "", tag);
-    }
-private:
-    int highlight_until;
-};
 
 static string _option_line(const GameOption *option, int name_len, int text_len)
 {

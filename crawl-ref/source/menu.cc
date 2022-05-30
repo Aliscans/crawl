@@ -1589,7 +1589,7 @@ bool Menu::process_key(int keyin)
             bool result = false;
             if (item->on_select)
                 result = item->on_select(*item);
-            else if (on_single_selection) // currently, no menus use both
+            else if (on_single_selection)
                 result = on_single_selection(*item);
             // the UI for singleselect menus behaves oddly if anything is
             // selected when it runs, because select acts as a toggle. So
