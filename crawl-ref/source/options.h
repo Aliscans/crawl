@@ -611,8 +611,6 @@ public:
     bool        tile_water_anim;
     bool        tile_misc_anim;
     vector<string> tile_layout_priority;
-    pair<int, int> tile_weapon_offsets;
-    pair<int, int> tile_shield_offsets;
 #ifdef USE_TILE_WEB
     bool        tile_realtime_anim;
     string      tile_display_mode;
@@ -638,11 +636,15 @@ private:
     int fire_items_start_w; // index of first item for fire command
     monster_type   tile_use_monster_w;
     tileidx_t      tile_player_tile_w;
+    pair<int, int> tile_weapon_offsets_w;
+    pair<int, int> tile_shield_offsets_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
     const tileidx_t &tile_player_tile = tile_player_tile_w;
+    const pair<int, int> &tile_weapon_offsets = tile_weapon_offsets_w;
+    const pair<int, int> &tile_shield_offsets = tile_shield_offsets_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -710,7 +712,8 @@ private:
     bool set_lang(const char *s);
     void set_fake_langs(const string &input);
     string set_player_tile(const string &s);
-    void set_tile_offsets(const string &s, bool set_shield);
+    string set_tile_weapon_offsets(const string &s);
+    string set_tile_shield_offsets(const string &s);
     void add_force_spell_targeter(const string &s, bool prepend);
     void remove_force_spell_targeter(const string &s, bool prepend);
     void add_force_ability_targeter(const string &s, bool prepend);

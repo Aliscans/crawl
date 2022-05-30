@@ -488,6 +488,10 @@ const vector<GameOption*> game_options::build_options_list()
 #ifdef USE_TILE
         new CustomStringGameOption(&game_options::set_player_tile,
                                    {"tile_player_tile"}, this, "normal"),
+        new CustomStringGameOption(&game_options::set_tile_weapon_offsets,
+                                   {"tile_weapon_offsets"}, this, "reset"),
+        new CustomStringGameOption(&game_options::set_tile_shield_offsets,
+                                   {"tile_shield_offsets"}, this, "reset"),
 #endif
 #ifdef USE_TILE_WEB
         new BoolGameOption(SIMPLE_NAME(tile_level_map_hide_sidebar), false),
@@ -1307,10 +1311,6 @@ void game_options::reset_options()
     tile_tag_pref         = crawl_state.game_is_arena() ? TAGPREF_NAMED
                                                         : TAGPREF_ENEMY;
 
-    tile_weapon_offsets.first  = INT_MAX;
-    tile_weapon_offsets.second = INT_MAX;
-    tile_shield_offsets.first  = INT_MAX;
-    tile_shield_offsets.second = INT_MAX;
     tile_viewport_scale = 100;
     tile_map_scale      = 60;
 #endif
@@ -2506,39 +2506,31 @@ string game_options::set_player_tile(const string &field)
     return "";
 }
 
-void game_options::set_tile_offsets(const string &field, bool set_shield)
+static string _set_tile_offsets(const string &field, pair<int, int> &out)
 {
-    bool error = false;
-    pair<int, int> *offsets;
-    if (set_shield)
-        offsets = &tile_shield_offsets;
-    else
-        offsets = &tile_weapon_offsets;
-
     if (field == "reset")
+        out = {INT_MAX, INT_MAX};
+    else
     {
-        offsets->first = INT_MAX;
-        offsets->second = INT_MAX;
-        return;
+        int len = 0, x, y;
+        if (0 >= sscanf(field.c_str(), "%d,%d%n", &x, &y, &len) || field[len])
+            return "Invalid format: \""+field+"\".";
+        else if (abs(x) > 32 || abs(y) > 32)
+            return "Number out of range (not -32 to 32): \""+field+"\")";
+        else
+            out = {x, y};
     }
+    return "";
+}
 
-    vector<string> offs = split_string(",", field);
-    if (offs.size() != 2
-        || !parse_int(offs[0].c_str(), offsets->first)
-        || abs(offsets->first) > 32
-        || !parse_int(offs[1].c_str(), offsets->second)
-        || abs(offsets->second) > 32)
-    {
-        report_error("Invalid %s tile offsets: \"%s\"",
-                     set_shield ? "shield" : "weapon", field.c_str());
-        error = true;
-    }
+string game_options::set_tile_weapon_offsets(const string &field)
+{
+    return _set_tile_offsets(field, tile_weapon_offsets_w);
+}
 
-    if (error)
-    {
-        offsets->first = INT_MAX;
-        offsets->second = INT_MAX;
-    }
+string game_options::set_tile_shield_offsets(const string &field)
+{
+    return _set_tile_offsets(field, tile_shield_offsets_w);
 }
 #endif // USE_TILE
 
@@ -3769,10 +3761,6 @@ void game_options::read_option_line(const string &str, bool runscript)
     {
         read_option_line("tile_player_tile = playermons", runscript);
     }
-    else if (key == "tile_weapon_offsets")
-        set_tile_offsets(field, false);
-    else if (key == "tile_shield_offsets")
-        set_tile_offsets(field, true);
     else if (key == "tile_tag_pref")
         tile_tag_pref = _str_to_tag_pref(field.c_str());
 #endif // USE_TILE
