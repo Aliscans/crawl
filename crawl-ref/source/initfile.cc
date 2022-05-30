@@ -356,6 +356,8 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(messaging), false),
 #endif
         new GameOptionHeading("Interface: Quivers, firing, and ammo"),
+        new CustomStringGameOption(&game_options::set_fire_items_start,
+                                   {"fire_items_start"}, this, "a"),
         new IntGameOption(SIMPLE_NAME(fail_severity_to_quiver), 3, -1, 5),
         new BoolGameOption(SIMPLE_NAME(launcher_autoquiver), true),
         (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
@@ -1233,8 +1235,6 @@ void game_options::reset_options()
     flush_input[ FLUSH_BEFORE_COMMAND ] = false;
     flush_input[ FLUSH_ON_MESSAGE ]     = false;
     flush_input[ FLUSH_LUA ]            = true;
-
-    fire_items_start       = 0;           // start at slot 'a'
 
     // Clear fire_order and set up the defaults.
     set_fire_order("launcher, throwing, inscribed, spell, evokable, ability",
@@ -3252,13 +3252,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.allowed_combos.clear();
         NEWGAME_OPTION(game.allowed_weapons, str_to_weapon, weapon_type);
     }
-    else if (key == "fire_items_start")
-    {
-        if (isaalpha(field[0]))
-            fire_items_start = letter_to_index(field[0]);
-        else
-            report_error("Bad fire item start index: %s\n", field.c_str());
-    }
     else if (key == "fire_order")
         set_fire_order(field, plus_equal, caret_equal);
     else if (key == "fire_order_spell" && runscript)
@@ -4083,6 +4076,15 @@ void game_options::set_fake_langs(const string &input)
             report_error("Unknown language %s!", flang_name.c_str());
 
     }
+}
+
+// Set "fire_items_start" or return an error message.
+string game_options::set_fire_items_start(const string &field)
+{
+    if (!isaalpha(field[0]) || field.size() > 1)
+        return "Can only accept a single letter, not \""+field+"\"";
+    fire_items_start_w = letter_to_index(field[0]);
+    return "";
 }
 
 // Checks an include file name for safety and resolves it to a readable path.

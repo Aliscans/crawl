@@ -13,6 +13,7 @@
 #include "colour.h"
 #include "stringutil.h"
 #include "maybe-bool.h"
+#include "unwind.h"
 
 using std::vector;
 struct game_options;
@@ -213,6 +214,39 @@ public:
 private:
     string &value;
     string default_value;
+};
+
+// StringGameOption with a custom "set" function which is allowed to fail.
+class CustomStringGameOption : public GameOption
+{
+public:
+    CustomStringGameOption(string (game_options::*_set)(const string &),
+        vector<string> _names, game_options *_caller, string _default)
+    : GameOption(_names), set(_set), caller(_caller), default_value(_default)
+      { }
+
+    void reset() override
+    {
+        loadFromString(default_value, RCFILE_LINE_EQUALS);
+        GameOption::reset();
+    }
+
+    string loadFromString(const std::string &field, rc_line_type) override;
+
+    const string str() const override
+    {
+        return value;
+    }
+
+    bool load_from_UI() override
+    {
+        return load_string_from_UI(this);
+    }
+
+private:
+    string (game_options::*set)(const string &);
+    game_options *caller;
+    string value, default_value;
 };
 
 #ifdef USE_TILE

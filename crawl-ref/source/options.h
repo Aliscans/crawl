@@ -299,7 +299,6 @@ public:
     bool        action_panel_glyphs;
 #endif
 
-    int         fire_items_start; // index of first item for fire command
     vector<unsigned> fire_order;  // missile search order for 'f' command
     unordered_set<spell_type, hash<int>> fire_order_spell;
     unordered_set<ability_type, hash<int>> fire_order_ability;
@@ -638,8 +637,10 @@ private:
     string_map     variables;
     set<string>    constants; // Variables that can't be changed
     set<string>    included;  // Files we've included already.
+    int fire_items_start_w; // index of first item for fire command
 
 public:
+    const int &fire_items_start = fire_items_start_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -660,6 +661,7 @@ public:
     void write_prefs(FILE *f);
 
     void reset_aliases(bool clear=true);
+    string set_fire_items_start(const string &s);
 private:
     string unalias(const string &key) const;
     string expand_vars(const string &field) const;

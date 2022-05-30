@@ -290,6 +290,19 @@ const string StringGameOption::str() const
     return value;
 }
 
+// set() should either return an error string and change nothing, or implement
+// the option change and return "".
+string CustomStringGameOption::loadFromString(const string &field,
+                                              rc_line_type ltyp)
+{
+    string new_value = field;
+    const string error = (caller->*set)(new_value);
+    if (!error.empty())
+        return name()+": "+error;
+    value = new_value;
+    return GameOption::loadFromString(field, ltyp);
+}
+
 string ColourThresholdOption::loadFromString(const string &field,
                                              rc_line_type ltyp)
 {
