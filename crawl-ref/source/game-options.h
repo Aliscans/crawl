@@ -322,16 +322,29 @@ template<typename T>
 class MultipleChoiceGameOption : public GameOption
 {
 public:
+    typedef vector<pair<string, T>> vpst;
     MultipleChoiceGameOption(T &_val, vector<string> _names, T _default,
-                             vector<pair<string, T>> _choices,
-                             bool _normalize_bools=false)
-        : GameOption(_names), value(_val), default_value(_default),
-          normalize_bools(_normalize_bools)
+                             vpst _choices)
+        : GameOption(_names), value(_val), default_value(_default)
         {
             choices = map<string, T>(_choices.begin(), _choices.end());
             for (auto c = _choices.rbegin(); c != _choices.rend(); ++c)
                 rchoices[c->second] = c->first;
+            ASSERT(rchoices.end() != rchoices.find(default_value));
         }
+
+    static vpst add_bool(T _no, T _yes, vpst &list)
+    {
+        vpst boolv = {{"false", _no}, {"no", _no}, {"0", _no},
+                      {"true", _yes}, {"yes", _yes}, {"1", _yes}};
+        list.insert(list.end(), boolv.begin(), boolv.end());
+        return list;
+    }
+
+    MultipleChoiceGameOption(T &_val, vector<string> _names, T _default,
+                             T _no, T _yes, vpst _choices)
+        : MultipleChoiceGameOption(_val, _names, _default,
+                                   add_bool(_no, _yes, _choices)) { }
 
     void reset() override
     {
@@ -341,16 +354,7 @@ public:
 
     string loadFromString(const std::string &field, rc_line_type ltyp) override
     {
-        string normalized = field;
-        if (normalize_bools)
-        {
-            if (field == "1" || field == "yes")
-                normalized = "true";
-            else if (field == "0" || field == "no")
-                normalized = "false";
-        }
-
-        const auto choice = choices.find(normalized);
+        const auto choice = choices.find(field);
         if (choice == choices.end())
         {
             string all_choices = comma_separated_fn(choices.begin(),
@@ -363,7 +367,7 @@ public:
         else
         {
             value = choice->second;
-            return GameOption::loadFromString(normalized, ltyp);
+            return GameOption::loadFromString(field, ltyp);
         }
     }
 
@@ -388,7 +392,6 @@ private:
     T &value, default_value;
     map<string, T> choices;
     map<T, string> rchoices; // T->string, with only the first copy of dups.
-    bool normalize_bools;
 };
 
 bool read_bool(const std::string &field, bool def_value);
