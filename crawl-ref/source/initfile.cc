@@ -165,6 +165,7 @@ const vector<GameOption*> game_options::build_options_list()
 #if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
         new BoolGameOption(SIMPLE_NAME(remember_name), true),
 #endif
+        new BoolGameOption(game.fully_random, {"fully_random"}, false),
 #ifndef DGAMELAUNCH
         new BoolGameOption(SIMPLE_NAME(restart_after_save), true),
         new BoolGameOption(SIMPLE_NAME(newgame_after_quit), false),
@@ -178,13 +179,14 @@ const vector<GameOption*> game_options::build_options_list()
 #ifndef DGAMELAUNCH
         new StringGameOption(SIMPLE_NAME(morgue_dir),
                              _get_save_path("morgue/")),
-        new StringGameOption(SIMPLE_NAME(map_file_name), ""),
 #endif
         new BoolGameOption(SIMPLE_NAME(sounds_on), true),
         new StringGameOption(SIMPLE_NAME(sound_file_path), ""),
         new BoolGameOption(SIMPLE_NAME(one_SDL_sound_channel), false),
         new GameOptionHeading("Interface: Dropping and Picking up"),
         new BoolGameOption(SIMPLE_NAME(pickup_thrown), true),
+        new MultipleChoiceGameOption<int>(SIMPLE_NAME(assign_item_slot),
+            SS_FORWARD, {{"forward", SS_FORWARD}, {"backward", SS_BACKWARD}}),
         new IntGameOption(SIMPLE_NAME(pickup_menu_limit), 1),
         new ListGameOption<text_pattern>(SIMPLE_NAME(drop_filter)),
         new GameOptionHeading(
@@ -258,7 +260,16 @@ const vector<GameOption*> game_options::build_options_list()
                            true),
         new BoolGameOption(SIMPLE_NAME(equip_unequip), false),
         new BoolGameOption(SIMPLE_NAME(jewellery_prompt), false),
+        new MultipleChoiceGameOption<easy_confirm_type>(
+            SIMPLE_NAME(easy_confirm), easy_confirm_type::safe,
+            {{"none", easy_confirm_type::none},
+            {"safe", easy_confirm_type::safe},
+            {"all", easy_confirm_type::all}}),
         new BoolGameOption(SIMPLE_NAME(simple_targeting), false),
+        new MultipleChoiceGameOption<confirm_prompt_type>(
+            SIMPLE_NAME(allow_self_target), confirm_prompt_type::prompt,
+            confirm_prompt_type::cancel, confirm_prompt_type::none,
+            {{"prompt", confirm_prompt_type::prompt}}),
         new BoolGameOption(SIMPLE_NAME(ability_menu), true),
         new BoolGameOption(SIMPLE_NAME(spell_menu), false),
         new BoolGameOption(SIMPLE_NAME(easy_floor_use), false),
@@ -308,6 +319,9 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(msg_condense_repeats), true),
         new BoolGameOption(SIMPLE_NAME(msg_condense_short), true),
         new BoolGameOption(SIMPLE_NAME(show_travel_trail), USING_DGL),
+        new MultipleChoiceGameOption<skill_focus_mode>(
+            SIMPLE_NAME(skill_focus), SKM_FOCUS_ON, SKM_FOCUS_OFF, SKM_FOCUS_ON,
+            {{"toggle", SKM_FOCUS_TOGGLE}}),
         new BoolGameOption(SIMPLE_NAME(default_show_all_skills), false),
         new IntGameOption(SIMPLE_NAME(view_delay), DEFAULT_VIEW_DELAY, 0),
         new BoolGameOption(SIMPLE_NAME(darken_beyond_range), true),
@@ -338,6 +352,11 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(launcher_autoquiver), true),
         (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
             ->set_on_change(_dirty_prefs),
+        new GameOptionHeading("Interface: Inscriptions"),
+        new MultipleChoiceGameOption<maybe_bool>(
+            SIMPLE_NAME(show_god_gift), MB_MAYBE, MB_FALSE, MB_TRUE,
+            {{"unidentified", MB_MAYBE}, {"unident", MB_MAYBE},
+             {"unid", MB_MAYBE}}),
         new GameOptionHeading("Interface: Tiles Options"),
 #ifdef USE_TILE
         new StringGameOption(SIMPLE_NAME(tile_show_items), "!?/=([)}:|"),
@@ -448,6 +467,9 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
 #endif
 #ifdef USE_TILE_WEB
+        new MultipleChoiceGameOption<string>(
+            SIMPLE_NAME(tile_display_mode), "tiles",
+            {{"tiles", "tiles"}, {"hybrid", "hybrid"}, {"glyphs", "glyphs"}}),
         new BoolGameOption(SIMPLE_NAME(tile_level_map_hide_messages), true),
         new BoolGameOption(SIMPLE_NAME(tile_level_map_hide_sidebar), false),
         new BoolGameOption(SIMPLE_NAME(tile_web_mouse_control), true),
@@ -461,6 +483,7 @@ const vector<GameOption*> game_options::build_options_list()
         new IntGameOption(SIMPLE_NAME(dump_item_origin_price), -1, -1),
         new IntGameOption(SIMPLE_NAME(dump_message_count), 40),
         new GameOptionHeading("Character Dump: Notes"),
+        new StringGameOption(SIMPLE_NAME(user_note_prefix), ""),
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_items)),
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_monsters)),
         new IntGameOption(SIMPLE_NAME(note_hp_percent), 5, 0, 100),
@@ -472,6 +495,19 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(note_dgl_messages), true),
         new GameOptionHeading("Miscellaneous: All OS"),
         new BoolGameOption(SIMPLE_NAME(mouse_input), false),
+#if defined(WIZARD) && !defined(DGAMELAUNCH)
+# ifdef DEBUG_DIAGNOSTICS
+#  define WIZ_DEFAULT WIZ_YES
+# else
+#  define WIZ_DEFAULT WIZ_NO
+# endif
+        new MultipleChoiceGameOption<int>(SIMPLE_NAME(wiz_mode),
+            WIZ_DEFAULT, WIZ_NO, WIZ_YES, {{"never", WIZ_NEVER}}),
+        new MultipleChoiceGameOption<int>(SIMPLE_NAME(explore_mode),
+            WIZ_NO, WIZ_NO, WIZ_YES, {{"never", WIZ_NEVER}}),
+#endif
+        new MultipleChoiceGameOption<char_set_type>(SIMPLE_NAME(char_set),
+            CSET_DEFAULT, {{"ascii", CSET_ASCII}, {"default", CSET_DEFAULT}}),
         new BoolGameOption(SIMPLE_NAME(use_fake_player_cursor), true),
         new BoolGameOption(SIMPLE_NAME(show_player_species), false),
         new BoolGameOption(SIMPLE_NAME(use_modifier_prefix_keys), true),
@@ -1147,8 +1183,6 @@ void game_options::reset_options()
 
     game = newgame_def();
 
-    char_set      = CSET_DEFAULT;
-
     incremental_pregen = true;
     pregen_dungeon = false;
 
@@ -1161,12 +1195,6 @@ void game_options::reset_options()
     autopickups.set(OBJ_JEWELLERY);
     autopickups.set(OBJ_WANDS);
 
-    easy_confirm           = easy_confirm_type::safe;
-    allow_self_target      = confirm_prompt_type::prompt;
-    skill_focus            = SKM_FOCUS_ON;
-
-    user_note_prefix       = "";
-
     arena_dump_msgs        = false;
     arena_dump_msgs_all    = false;
     arena_list_eq          = false;
@@ -1174,9 +1202,6 @@ void game_options::reset_options()
     // Sort only pickup menus by default.
     sort_menus.clear();
     set_menu_sort("pickup: true");
-
-    assign_item_slot       = SS_FORWARD;
-    show_god_gift          = MB_MAYBE;
 
     explore_stop           = (ES_ITEM | ES_STAIR | ES_PORTAL | ES_BRANCH
                               | ES_SHOP | ES_ALTAR | ES_RUNED_DOOR
@@ -1244,23 +1269,12 @@ void game_options::reset_options()
 #endif
 #endif
 
-#ifdef WIZARD
-#  ifdef DGAMELAUNCH
+#if defined(WIZARD) && defined(DGAMELAUNCH)
     if (wiz_mode != WIZ_NO)
     {
         wiz_mode         = WIZ_NEVER;
         explore_mode     = WIZ_NEVER;
     }
-#  else
-#    ifdef DEBUG_DIAGNOSTICS
-    // Most of the time in debug builds, you want to be using wizmode anyways.
-    // This can be overridden by an explicit rc setting.
-    wiz_mode             = WIZ_YES;
-#    else
-    wiz_mode             = WIZ_NO;
-#    endif
-    explore_mode         = WIZ_NO;
-#  endif
 #endif
     terp_files.clear();
 
@@ -1287,8 +1301,6 @@ void game_options::reset_options()
 #endif
 
 #ifdef USE_TILE_WEB
-    tile_display_mode = "tiles";
-
     action_panel.clear();
     action_panel.emplace_back(OBJ_WANDS);
     action_panel.emplace_back(OBJ_SCROLLS);
@@ -3023,6 +3035,7 @@ void game_options::read_option_line(const string &str, bool runscript)
         && key != "item_slot"
         && key != "ability_slot"
         && key != "sound" && key != "hold_sound" && key != "sound_file_path"
+        && key != "user_note_prefix"
 #ifdef USE_TILE_WEB
         && key != "action_panel_filter"
 #endif
@@ -3065,15 +3078,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.name = field;
     }
 #endif
-    else if (key == "char_set")
-    {
-        if (field == "ascii")
-            char_set = CSET_ASCII;
-        else if (field == "default")
-            char_set = CSET_DEFAULT;
-        else
-            report_error("Bad character set, using default: %s\n", field.c_str());
-    }
     else if (key == "language")
     {
         if (!set_lang(field.c_str()))
@@ -3091,25 +3095,6 @@ void game_options::read_option_line(const string &str, bool runscript)
             autopickup_on = 1;
         else
             autopickup_on = 0;
-    }
-    else if (key == "easy_confirm")
-    {
-        // decide when to allow both 'Y'/'N' and 'y'/'n' on yesno() prompts
-        if (field == "none")
-            easy_confirm = easy_confirm_type::none;
-        else if (field == "safe")
-            easy_confirm = easy_confirm_type::safe;
-        else if (field == "all")
-            easy_confirm = easy_confirm_type::all;
-    }
-    else if (key == "allow_self_target")
-    {
-        if (field == "yes")
-            allow_self_target = confirm_prompt_type::none;
-        else if (field == "no")
-            allow_self_target = confirm_prompt_type::cancel;
-        else if (field == "prompt")
-            allow_self_target = confirm_prompt_type::prompt;
     }
     else if (key == "lua_file" && runscript)
     {
@@ -3239,8 +3224,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.allowed_weapons.clear();
         NEWGAME_OPTION(game.allowed_combos, string, string);
     }
-    else if (key == "fully_random")
-        game.fully_random = read_bool(field, game.fully_random);
     else if (key == "species" || key == "race")
     {
         game.allowed_combos.clear();
@@ -3265,28 +3248,10 @@ void game_options::read_option_line(const string &str, bool runscript)
         else
             report_error("Bad fire item start index: %s\n", field.c_str());
     }
-    else if (key == "assign_item_slot")
-    {
-        if (field == "forward")
-            assign_item_slot = SS_FORWARD;
-        else if (field == "backward")
-            assign_item_slot = SS_BACKWARD;
-    }
 #ifndef DGAMELAUNCH
     else if (key == "restart_after_game")
         restart_after_game = read_maybe_bool(field);
 #endif
-    else if (key == "show_god_gift")
-    {
-        if (field == "yes")
-            show_god_gift = MB_TRUE;
-        else if (field == "unid" || field == "unident" || field == "unidentified")
-            show_god_gift = MB_MAYBE;
-        else if (field == "no")
-            show_god_gift = MB_FALSE;
-        else
-            report_error("Unknown show_god_gift value: %s\n", field.c_str());
-    }
     else if (key == "fire_order")
         set_fire_order(field, plus_equal, caret_equal);
     else if (key == "fire_order_spell" && runscript)
@@ -3322,29 +3287,13 @@ void game_options::read_option_line(const string &str, bool runscript)
 #endif
     else if (key == "view_lock")
     {
-        const bool lock = read_bool(field, true);
-        view_lock_x = view_lock_y = lock;
+        read_option_line("view_lock_x = "+field, runscript);
+        read_option_line("view_lock_y = "+field, runscript);
     }
     else if (key == "scroll_margin")
     {
-        int scrollmarg = atoi(field.c_str());
-        if (scrollmarg < 0)
-            scrollmarg = 0;
-        scroll_margin_x = scroll_margin_y = scrollmarg;
-    }
-    else if (key == "user_note_prefix")
-    {
-        // field is already cleaned up from trim_string()
-        user_note_prefix = orig_field;
-    }
-    else if (key == "skill_focus")
-    {
-        if (field == "toggle")
-            skill_focus = SKM_FOCUS_TOGGLE;
-        else if (read_bool(field, true))
-            skill_focus = SKM_FOCUS_ON;
-        else
-            skill_focus = SKM_FOCUS_OFF;
+        read_option_line("scroll_margin_x = "+field, runscript);
+        read_option_line("scroll_margin_y = "+field, runscript);
     }
     else if (key == "flush")
     {
@@ -3369,37 +3318,10 @@ void game_options::read_option_line(const string &str, bool runscript)
                 = read_bool(field, flush_input[FLUSH_LUA]);
         }
     }
-    else if (key == "wiz_mode")
-    {
-        // wiz_mode is recognised as a legal key in all compiles -- bwr
-#ifdef WIZARD
-    #ifndef DGAMELAUNCH
-        if (field == "never")
-            wiz_mode = WIZ_NEVER;
-        else if (field == "no")
-            wiz_mode = WIZ_NO;
-        else if (field == "yes")
-            wiz_mode = WIZ_YES;
-        else
-            report_error("Unknown wiz_mode option: %s\n", field.c_str());
-    #endif
+#if !defined(WIZARD) || defined(DGAMELAUNCH)
+    else if (key == "wiz_mode" || key == "explore_mode")
+        ; // wiz_mode is recognised as a legal key in all compiles -- bwr
 #endif
-    }
-    else if (key == "explore_mode")
-    {
-#ifdef WIZARD
-    #ifndef DGAMELAUNCH
-        if (field == "never")
-            explore_mode = WIZ_NEVER;
-        else if (field == "no")
-            explore_mode = WIZ_NO;
-        else if (field == "yes")
-            explore_mode = WIZ_YES;
-        else
-            report_error("Unknown explore_mode option: %s\n", field.c_str());
-    #endif
-#endif
-    }
     else if (key == "ban_pickup")
     {
         // Only remove negative, not positive, exceptions.
@@ -3880,19 +3802,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         set_tile_offsets(field, true);
     else if (key == "tile_tag_pref")
         tile_tag_pref = _str_to_tag_pref(field.c_str());
-#ifdef USE_TILE_WEB
-    else if (key == "tile_display_mode")
-    {
-        if (field == "tiles" || field == "glyphs" || field == "hybrid")
-            tile_display_mode = field;
-        else
-        {
-            mprf(MSGCH_ERROR, "Unknown value for tile_display_mode: '%s'"
-                              " (possible values: tiles/glyphs/hybrid",
-                                                                field.c_str());
-        }
-    }
-#endif
 #endif // USE_TILE
 
     else if (key == "bindkey")
