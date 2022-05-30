@@ -292,7 +292,6 @@ public:
     bool        action_panel_glyphs;
 #endif
 
-    unordered_set<ability_type, hash<int>> fire_order_ability;
     bool        quiver_menu_focus;
     bool        launcher_autoquiver;
 
@@ -641,6 +640,7 @@ private:
 
     vector<unsigned> fire_order_w;  // missile search order for 'f' command
     unordered_set<spell_type, hash<int>> fire_order_spell_w;
+    unordered_set<ability_type, hash<int>> fire_order_ability_w;
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -661,6 +661,8 @@ public:
     const vector<unsigned> &fire_order = fire_order_w;
     const unordered_set<spell_type, hash<int>>
         &fire_order_spell = fire_order_spell_w;
+    const unordered_set<ability_type, hash<int>>
+        &fire_order_ability = fire_order_ability_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -710,7 +712,7 @@ private:
     string set_fire_order(vector<string> &fields);
     string add_fire_order_slot(const string &s);
     string set_fire_order_spell(vector<string> &fields);
-    void set_fire_order_ability(const string &s, bool append, bool remove);
+    string set_fire_order_ability(vector<string> &fields);
     void set_menu_sort(string field);
     string set_display_char(vector<string>&fields);
     string set_feature(vector<string>&fields);

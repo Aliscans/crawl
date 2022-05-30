@@ -386,6 +386,15 @@ const vector<GameOption*> game_options::build_options_list()
         new CustomListGameOption(&game_options::set_fire_order_spell,
                                  _rcfile_no_caret, {"fire_order_spell"}, this,
                                  "all"),
+        new CustomListGameOption(&game_options::set_fire_order_ability,
+                                 _rcfile_no_caret, {"fire_order_ability"}, this,
+                                 // ", " in the following means "delete".
+                                 "all, Berserk, Revivify, Fiery Armour"
+#ifdef WIZARD
+                                 ", Build terrain, Set terrain to build"
+                                 ", Clear terrain to floor"
+#endif
+                                 ", Foxfire Swarm, Rising Flame"),
         new IntGameOption(SIMPLE_NAME(fail_severity_to_quiver), 3, -1, 5),
         new BoolGameOption(SIMPLE_NAME(launcher_autoquiver), true),
         (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
@@ -1286,21 +1295,6 @@ void game_options::reset_options()
     flush_input[ FLUSH_ON_MESSAGE ]     = false;
     flush_input[ FLUSH_LUA ]            = true;
 
-    // Clear fire_order and set up the defaults.
-    set_fire_order_ability("all", false, false);
-
-    fire_order_ability.erase(ABIL_TROG_BERSERK);
-    fire_order_ability.erase(ABIL_REVIVIFY);
-    fire_order_ability.erase(ABIL_IGNIS_FIERY_ARMOUR);
-    fire_order_ability.erase(ABIL_IGNIS_FOXFIRE);
-    fire_order_ability.erase(ABIL_IGNIS_RISING_FLAME);
-#ifdef WIZARD
-    // makes testing quiver stuff impossible
-    fire_order_ability.erase(ABIL_WIZ_BUILD_TERRAIN);
-    fire_order_ability.erase(ABIL_WIZ_SET_TERRAIN);
-    fire_order_ability.erase(ABIL_WIZ_CLEAR_TERRAIN);
-#endif
-
     force_spell_targeter =
         { SPELL_HAILSTORM, SPELL_STARBURST, SPELL_FROZEN_RAMPARTS,
           SPELL_IGNITION, SPELL_NOXIOUS_BOG, SPELL_ANGUISH,
@@ -1596,43 +1590,43 @@ string game_options::set_item_glyph(vector<string> &fields)
     return "(mon_glyph) "+list;
 }
 
-void game_options::set_fire_order_ability(const string &s, bool append, bool remove)
+string game_options::set_fire_order_ability(vector<string> &fields)
 {
-    if (!append && !remove)
-        fire_order_ability.clear();
-    if (s == "all")
+    vector<string> errors;
+    fire_order_ability_w.clear();
+    for (string field : fields)
     {
-        if (remove)
-            fire_order_ability.clear();
-        else
-            for (const auto &a : get_defined_abilities())
-                fire_order_ability.insert(a);
-        return;
-    }
-    if (s == "attack")
-    {
-        for (const auto &a : get_defined_abilities())
-            if (quiver::is_autofight_combat_ability(a))
-                if (remove)
-                    fire_order_ability.erase(a);
-                else
-                    fire_order_ability.insert(a);
-        return;
-    }
-    vector<string> slots = split_string(",", s);
-    for (const string &slot : slots)
-    {
-        ability_type abil = ability_by_name(slot);
-        if (abil == ABIL_NON_ABILITY)
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        if ("all" == field && remove)
+            fire_order_spell_w.clear();
+        else if ("all" == field)
         {
-            report_error("Unknown ability '%s'\n", slot.c_str());
-            return;
+            for (const auto &a : get_defined_abilities())
+                fire_order_ability_w.insert(a);
         }
-        if (remove)
-            fire_order_ability.erase(abil);
+        else if ("attack" == field)
+        {
+            for (const auto &a : get_defined_abilities())
+                if (quiver::is_autofight_combat_ability(a))
+                    if (remove)
+                        fire_order_ability_w.erase(a);
+                    else
+                        fire_order_ability_w.insert(a);
+        }
         else
-            fire_order_ability.insert(abil);
+        {
+            ability_type abil = ability_by_name(field);
+            if (abil == ABIL_NON_ABILITY)
+                return "Unknown ability \""+field+"\".";
+            else if (remove)
+                fire_order_ability_w.erase(abil);
+            else
+                fire_order_ability_w.insert(abil);
+        }
     }
+    return "";
 }
 
 string game_options::set_fire_order_spell(vector<string> &fields)
@@ -3383,8 +3377,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.allowed_combos.clear();
         NEWGAME_OPTION(game.allowed_weapons, str_to_weapon, weapon_type);
     }
-    else if (key == "fire_order_ability" && runscript)
-        set_fire_order_ability(field, plus_equal || caret_equal, minus_equal);
 #ifndef DGAMELAUNCH
     // If DATA_DIR_PATH is set, don't set crawl_dir from .crawlrc.
 #ifndef DATA_DIR_PATH
