@@ -2735,8 +2735,6 @@ mon_glyph -= <monster name or symbol>
              mon_glyph += large zombie : darkgrey
              mon_glyph += small simulacrum : x
 
-        (The left hand side of the : is case-sensitive.)
-
         You can also specify another monster, so that it copies the base
         symbol and colour of that monster (this is not transitive). For
         example, if you think that slime creature colours are backwards:

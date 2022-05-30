@@ -562,6 +562,8 @@ const vector<GameOption*> game_options::build_options_list()
                                  _rcfile_plus_only, {"display_char"}, this),
         new CustomListGameOption(&game_options::set_feature, _rcfile_no_caret,
                                  {"feature"}, this, {}, ";"),
+        new CustomListGameOption(&game_options::set_mon_glyph, _rcfile_no_caret,
+                                 {"mon_glyph"}, this),
         new BoolGameOption(SIMPLE_NAME(use_fake_player_cursor), true),
         new BoolGameOption(SIMPLE_NAME(show_player_species), false),
         new BoolGameOption(SIMPLE_NAME(use_modifier_prefix_keys), true),
@@ -1394,7 +1396,6 @@ void game_options::reset_options()
     message_colour_mappings.clear();
     named_options.clear();
 
-    mon_glyph_overrides.clear();
     item_glyph_overrides.clear();
     item_glyph_cache.clear();
 
@@ -1542,6 +1543,26 @@ string game_options::set_feature(vector<string> &fields)
         return "";
     string list = comma_separated_line(errors.begin(), errors.end());
     return "(feature) "+list;
+}
+
+string game_options::set_mon_glyph(vector<string> &fields)
+{
+    mon_glyph_overrides_w.clear();
+    vector<string> errors;
+    for (const string &field : fields)
+    {
+        string error;
+        if (field[0] == ' ')
+            error = remove_mon_glyph_override(field.substr(1));
+        else
+            error = add_mon_glyph_override(field);
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(mon_glyph) "+list;
 }
 
 void game_options::set_fire_order_ability(const string &s, bool append, bool remove)
@@ -1710,8 +1731,9 @@ void game_options::remove_force_ability_targeter(const string &s, bool)
         force_ability_targeter.erase(abil);
 }
 
-static monster_type _mons_class_by_string(const string &name)
+static set<monster_type> _mons_classes_by_string(const string &name)
 {
+    set<monster_type> matches;
     const string match = lowercase_string(name);
     for (monster_type i = MONS_0; i < NUM_MONSTERS; ++i)
     {
@@ -1720,9 +1742,9 @@ static monster_type _mons_class_by_string(const string &name)
             continue;
 
         if (lowercase_string(me->name) == match)
-            return i;
+            matches.insert(i);
     }
-    return MONS_0;
+    return matches;
 }
 
 static set<monster_type> _mons_classes_by_glyph(const char letter)
@@ -1738,6 +1760,25 @@ static set<monster_type> _mons_classes_by_glyph(const char letter)
             matches.insert(i);
     }
     return matches;
+}
+
+// If "s" contains a colour and/or a character, set "out" to it and return true.
+// If anything fails to parse, return false and leave "out" as it is.
+static bool _parse_mon_glyph(cglyph_t &out, const string &s)
+{
+    cglyph_t md(0,0);
+    for (const string &p : split_string(" ", s))
+    {
+        const int col = str_to_colour(p, -1, false);
+        if (-1 != col)
+            md.col = col;
+        else if ("_" == p)
+            md.ch = ' ';
+        else if (!_read_symbol(p, &md.ch))
+            return false;
+    }
+    out = md;
+    return true;
 }
 
 cglyph_t game_options::parse_mon_glyph(const string &s) const
@@ -1756,63 +1797,72 @@ cglyph_t game_options::parse_mon_glyph(const string &s) const
     return md;
 }
 
-void game_options::remove_mon_glyph_override(const string &text, bool /*prepend*/)
+static string _string_to_monsters(set<monster_type> &matches,
+                                  const string &name)
 {
-    vector<string> override = split_string(":", text);
-
-    set<monster_type> matches;
-    if (override[0].length() == 1)
-        matches = _mons_classes_by_glyph(override[0][0]);
+    if (name.length() == 1)
+    {
+        matches = _mons_classes_by_glyph(name[0]);
+        if (matches.empty())
+            return "No monster uses the symbol \""+name+"\".";
+    }
     else
     {
-        const monster_type m = _mons_class_by_string(override[0]);
-        if (m == MONS_0)
-        {
-            report_error("Unknown monster: \"%s\"", text.c_str());
-            return;
-        }
-        matches.insert(m);
+        matches = _mons_classes_by_string(name);
+        if (matches.empty())
+            return "Unknown monster: \""+name+"\"";
     }
-    for (monster_type m : matches)
-        mon_glyph_overrides.erase(m);;
+    return "";
 }
 
-void game_options::add_mon_glyph_override(const string &text, bool /*prepend*/)
+string game_options::remove_mon_glyph_override(const string &text)
 {
-    vector<string> override = split_string(":", text);
-    if (override.size() != 2u)
-        return;
+    unsigned colon = text.find(':', 1);
+    string monster = (colon == text.npos) ? text : text.substr(0, colon);
+    trim_string(monster);
 
     set<monster_type> matches;
-    if (override[0].length() == 1)
-        matches = _mons_classes_by_glyph(override[0][0]);
-    else
-    {
-        const monster_type m = _mons_class_by_string(override[0]);
-        if (m == MONS_0)
-        {
-            report_error("Unknown monster: \"%s\"", text.c_str());
-            return;
-        }
-        matches.insert(m);
-    }
+    string error = _string_to_monsters(matches, monster);
+    if (!error.empty())
+        return error;
+
+    for (monster_type m : matches)
+        mon_glyph_overrides_w.erase(m);;
+    return "";
+}
+
+string game_options::add_mon_glyph_override(const string &text)
+{
+    unsigned colon = text.find(':', 1);
+    if (text.npos == colon)
+        return "Missing :";
+    else if (text.size() == colon+1)
+        return "Missing replacement string";
+    string from = trimmed_string(text.substr(0, colon));
+    string to = trimmed_string(text.substr(colon+1));
+
+    set<monster_type> matches;
+    string error = _string_to_monsters(matches, from);
+    if (!error.empty())
+        return error;
 
     cglyph_t mdisp;
 
     // Look for monsters first so that "blue devil" works right.
-    const monster_type n = _mons_class_by_string(override[1]);
-    if (n != MONS_0)
+    set<monster_type> replacement = _mons_classes_by_string(to);
+    if (!replacement.empty())
     {
-        const monsterentry *me = get_monster_data(n);
+        const monsterentry *me = get_monster_data(*(replacement.begin()));
         mdisp.ch = me->basechar;
         mdisp.col = me->colour;
     }
-    else
-        mdisp = parse_mon_glyph(override[1]);
+    else if (!_parse_mon_glyph(mdisp, to))
+        return "Failed to parse replacement string";
 
     if (mdisp.ch || mdisp.col)
         for (monster_type m : matches)
-            mon_glyph_overrides[m] = mdisp;
+            mon_glyph_overrides_w[m] = mdisp;
+    return "";
 }
 
 void game_options::remove_item_glyph_override(const string &text, bool /*prepend*/)
@@ -2601,10 +2651,10 @@ string game_options::set_player_tile(const string &field)
     else if (fields.size() == 2 && fields[0] == "mons")
     {
         // Handle mons:<monster-name> values
-        const monster_type m = _mons_class_by_string(fields[1]);
-        if (m == MONS_0)
+        const auto m = _mons_classes_by_string(fields[1]);
+        if (m.empty())
             return make_stringf("Unknown monster: \"%s\"", fields[1].c_str());
-        tile_use_monster_w = m;
+        tile_use_monster_w = *(m.begin());
         tile_player_tile_w = 0;
     }
     else
@@ -3259,16 +3309,6 @@ void game_options::read_option_line(const string &str, bool runscript)
     }
     else if (starts_with(key, "cset")) // compatibility with old rcfiles
         read_option_line("display_char += "+field, runscript);
-    else if (key == "mon_glyph")
-    {
-        if (plain)
-           mon_glyph_overrides.clear();
-
-        if (minus_equal)
-            split_parse(field, ",", &game_options::remove_mon_glyph_override);
-        else
-            split_parse(field, ",", &game_options::add_mon_glyph_override);
-    }
     else if (key == "item_glyph")
     {
         if (plain)

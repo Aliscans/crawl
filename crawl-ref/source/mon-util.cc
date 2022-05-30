@@ -1520,9 +1520,9 @@ bool mons_can_be_dazzled(monster_type mc)
 char32_t mons_char(monster_type mc)
 {
     if (Options.mon_glyph_overrides.count(mc)
-        && Options.mon_glyph_overrides[mc].ch)
+        && Options.mon_glyph_overrides.at(mc).ch)
     {
-        return Options.mon_glyph_overrides[mc].ch;
+        return Options.mon_glyph_overrides.at(mc).ch;
     }
     else
         return monster_symbols[mc].glyph;
@@ -1555,9 +1555,9 @@ int mons_class_colour(monster_type mc)
     // it's ok to override it here.
     if (mc == MONS_PLAYER
         && Options.mon_glyph_overrides.count(MONS_PLAYER)
-        && Options.mon_glyph_overrides[MONS_PLAYER].col)
+        && Options.mon_glyph_overrides.at(MONS_PLAYER).col)
     {
-        return Options.mon_glyph_overrides[MONS_PLAYER].col;
+        return Options.mon_glyph_overrides.at(MONS_PLAYER).col;
     }
     else
         return monster_symbols[mc].colour;

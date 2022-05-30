@@ -1692,9 +1692,9 @@ int monster_info::spell_hd(spell_type spell) const
 unsigned monster_info::colour(bool base_colour) const
 {
     if (!base_colour && Options.mon_glyph_overrides.count(type)
-        && Options.mon_glyph_overrides[type].col)
+        && Options.mon_glyph_overrides.at(type).col)
     {
-        return Options.mon_glyph_overrides[type].col;
+        return Options.mon_glyph_overrides.at(type).col;
     }
     else if (_colour == COLOUR_INHERIT)
         return mons_class_colour(type);
