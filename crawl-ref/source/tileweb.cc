@@ -749,15 +749,19 @@ void TilesFramework::zoom_dungeon(bool in)
 {
     if (m_ui_state == UI_VIEW_MAP)
     {
-        Options.tile_map_scale = min(300, max(20,
-                    Options.tile_map_scale + (in ? ZOOM_INC : -ZOOM_INC)));
+        int scale = min(300, max(20, Options.tile_map_scale
+                                     + (in ? ZOOM_INC : -ZOOM_INC)));
+        string value = to_string(scale/100) + "." + to_string(scale%100);
+        Options.read_option_line("tile_map_scale = " + value);
         _set_option_int("tile_map_scale", Options.tile_map_scale);
         dprf("Zooming map to %d", Options.tile_map_scale);
     }
     else
     {
-        Options.tile_viewport_scale = min(300, max(20,
-                    Options.tile_viewport_scale + (in ? ZOOM_INC : -ZOOM_INC)));
+        int scale = min(300, max(20, Options.tile_viewport_scale
+                                 + (in ? ZOOM_INC : -ZOOM_INC)));
+        string value = to_string(scale/100) + "." + to_string(scale%100);
+        Options.read_option_line("tile_viewport_scale = " + value);
         _set_option_int("tile_viewport_scale", Options.tile_viewport_scale);
         dprf("Zooming to %d", Options.tile_viewport_scale);
     }

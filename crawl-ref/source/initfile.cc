@@ -415,6 +415,10 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
 #ifdef USE_TILE
         new IntGameOption(SIMPLE_NAME(tile_map_pixels), 0, 0, INT_MAX),
+        new CustomStringGameOption(&game_options::set_tile_viewport_scale,
+                                   {"tile_viewport_scale"}, this, "1.00"),
+        new CustomStringGameOption(&game_options::set_tile_map_scale,
+                                   {"tile_map_scale"}, this, "0.60"),
         new IntGameOption(SIMPLE_NAME(tile_cell_pixels), 32, 1, INT_MAX),
 #endif
 #ifdef USE_TILE_LOCAL
@@ -1310,9 +1314,6 @@ void game_options::reset_options()
     // XXX: arena may now be chosen after options are read.
     tile_tag_pref         = crawl_state.game_is_arena() ? TAGPREF_NAMED
                                                         : TAGPREF_ENEMY;
-
-    tile_viewport_scale = 100;
-    tile_map_scale      = 60;
 #endif
 
 #ifdef USE_TILE_WEB
@@ -3816,37 +3817,6 @@ void game_options::read_option_line(const string &str, bool runscript)
                                                             field.c_str());
         }
     }
-#ifdef USE_TILE
-    // TODO: generalize these to an option type?
-    else if (key == "tile_viewport_scale")
-    {
-        float tmp_scale;
-        if (sscanf(field.c_str(), "%f", &tmp_scale))
-        {
-            tile_viewport_scale = min(1600, max(20,
-                                        static_cast<int>(tmp_scale * 100)));
-        }
-        else
-        {
-            report_error("Expected a decimal value for tile_viewport_scale,"
-                " but got '%s'.", field.c_str());
-        }
-    }
-    else if (key == "tile_map_scale")
-    {
-        float tmp_scale;
-        if (sscanf(field.c_str(), "%f", &tmp_scale))
-        {
-            tile_map_scale = min(1600, max(20,
-                                        static_cast<int>(tmp_scale * 100)));
-        }
-        else
-        {
-            report_error("Expected a decimal value for tile_map_scale,"
-                " but got '%s'.", field.c_str());
-        }
-    }
-#endif
 #ifdef USE_TILE_WEB
     else if (key == "action_panel")
     {
@@ -4069,6 +4039,36 @@ string game_options::set_fire_items_start(const string &field)
     fire_items_start_w = letter_to_index(field[0]);
     return "";
 }
+
+#ifdef USE_TILE
+static string _set_tile_scale(int &out, const string &field)
+{
+    int whole, frac = 0, l1 = 0, l2 = 0, l3 = 0;
+    auto match = sscanf(field.c_str(), "%3d%n.%2d%n%*d%n",
+                        &whole, &l1, &frac, &l2, &l3);
+    if (0 < match && '\0' == field[l3 > 0 ? l3 : l2 > 0 ? l2 : l1])
+    {
+        int tmp_scale = whole*100+frac;
+        if (20 <= tmp_scale && 1600 >= tmp_scale)
+        {
+            out = tmp_scale;
+            return "";
+        }
+    }
+    return "Can only accept values betwen 0.20 and 16.00, not \""+field+
+        "\" (match="+to_string(match)+").";
+}
+
+string game_options::set_tile_viewport_scale(const string &field)
+{
+    return _set_tile_scale(tile_viewport_scale_w, field);
+}
+
+string game_options::set_tile_map_scale(const string &field)
+{
+    return _set_tile_scale(tile_map_scale_w, field);
+}
+#endif
 
 // Checks an include file name for safety and resolves it to a readable path.
 // If file cannot be resolved, returns the empty string (this does not throw!)

@@ -589,8 +589,6 @@ public:
 #endif
     int         tile_sidebar_pixels;
     int         tile_cell_pixels;
-    int         tile_viewport_scale;
-    int         tile_map_scale;
     bool        tile_filter_scaling;
     int         tile_map_pixels;
 
@@ -638,6 +636,8 @@ private:
     tileidx_t      tile_player_tile_w;
     pair<int, int> tile_weapon_offsets_w;
     pair<int, int> tile_shield_offsets_w;
+    int            tile_viewport_scale_w;
+    int            tile_map_scale_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -645,6 +645,8 @@ public:
     const tileidx_t &tile_player_tile = tile_player_tile_w;
     const pair<int, int> &tile_weapon_offsets = tile_weapon_offsets_w;
     const pair<int, int> &tile_shield_offsets = tile_shield_offsets_w;
+    const int &tile_viewport_scale = tile_viewport_scale_w;
+    const int &tile_map_scale = tile_map_scale_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -666,6 +668,10 @@ public:
 
     void reset_aliases(bool clear=true);
     string set_fire_items_start(const string &s);
+#ifdef USE_TILE
+    string set_tile_viewport_scale(const string &s);
+    string set_tile_map_scale(const string &s);
+#endif
 private:
     string unalias(const string &key) const;
     string expand_vars(const string &field) const;

@@ -1054,8 +1054,10 @@ bool TilesFramework::is_using_small_layout()
 void TilesFramework::zoom_dungeon(bool in)
 {
 #if defined(USE_TILE_LOCAL)
-    int &current_scale = m_map_mode_enabled ?  Options.tile_map_scale
-                                            :  Options.tile_viewport_scale;
+    string option = m_map_mode_enabled ? "tile_map_scale"
+                                       : "tile_viewport_scale";
+    int current_scale = m_map_mode_enabled ? Options.tile_map_scale
+                                           : Options.tile_viewport_scale;
     // max zoom relative to to tile size that keeps LOS in view
     int max_zoom = 100 * m_windowsz.y / Options.tile_cell_pixels
                                       / ENV_SHOW_DIAMETER;
@@ -1063,6 +1065,8 @@ void TilesFramework::zoom_dungeon(bool in)
         max_zoom += ZOOM_INC - max_zoom % ZOOM_INC; // round up
     current_scale = min(max_zoom, max(20,
                     current_scale + (in ? ZOOM_INC : -ZOOM_INC)));
+    Options.read_option_line(option + " = " + to_string(current_scale/100)
+                             + "." + to_string(current_scale%100));
     do_layout(); // recalculate the viewport setup
     dprf("Zooming to %d", current_scale);
     redraw_screen(false);
