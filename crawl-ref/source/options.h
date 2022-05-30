@@ -611,8 +611,6 @@ public:
     bool        tile_water_anim;
     bool        tile_misc_anim;
     vector<string> tile_layout_priority;
-    monster_type tile_use_monster;
-    tileidx_t   tile_player_tile;
     pair<int, int> tile_weapon_offsets;
     pair<int, int> tile_shield_offsets;
 #ifdef USE_TILE_WEB
@@ -638,9 +636,13 @@ private:
     set<string>    constants; // Variables that can't be changed
     set<string>    included;  // Files we've included already.
     int fire_items_start_w; // index of first item for fire command
+    monster_type   tile_use_monster_w;
+    tileidx_t      tile_player_tile_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
+    const monster_type &tile_use_monster = tile_use_monster_w;
+    const tileidx_t &tile_player_tile = tile_player_tile_w;
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -707,7 +709,7 @@ private:
     void set_option_fragment(const string &s, bool prepend);
     bool set_lang(const char *s);
     void set_fake_langs(const string &input);
-    void set_player_tile(const string &s);
+    string set_player_tile(const string &s);
     void set_tile_offsets(const string &s, bool set_shield);
     void add_force_spell_targeter(const string &s, bool prepend);
     void remove_force_spell_targeter(const string &s, bool prepend);

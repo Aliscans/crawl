@@ -484,6 +484,12 @@ const vector<GameOption*> game_options::build_options_list()
             SIMPLE_NAME(tile_display_mode), "tiles",
             {{"tiles", "tiles"}, {"hybrid", "hybrid"}, {"glyphs", "glyphs"}}),
         new BoolGameOption(SIMPLE_NAME(tile_level_map_hide_messages), true),
+#endif
+#ifdef USE_TILE
+        new CustomStringGameOption(&game_options::set_player_tile,
+                                   {"tile_player_tile"}, this, "normal"),
+#endif
+#ifdef USE_TILE_WEB
         new BoolGameOption(SIMPLE_NAME(tile_level_map_hide_sidebar), false),
         new BoolGameOption(SIMPLE_NAME(tile_web_mouse_control), true),
         new MultipleChoiceGameOption<string>(
@@ -1301,8 +1307,6 @@ void game_options::reset_options()
     tile_tag_pref         = crawl_state.game_is_arena() ? TAGPREF_NAMED
                                                         : TAGPREF_ENEMY;
 
-    tile_use_monster         = MONS_PROGRAM_BUG;
-    tile_player_tile         = 0;
     tile_weapon_offsets.first  = INT_MAX;
     tile_weapon_offsets.second = INT_MAX;
     tile_shield_offsets.first  = INT_MAX;
@@ -2442,25 +2446,26 @@ static int _str_to_killcategory(const string &s)
 }
 
 #ifdef USE_TILE
-void game_options::set_player_tile(const string &field)
+string game_options::set_player_tile(const string &field)
 {
-    if (field == "normal")
+    if (field == "normal") // needed, as "mons:program bug" is an error.
     {
-        tile_use_monster = MONS_0;
-        tile_player_tile = 0;
-        return;
+        tile_use_monster_w = MONS_0;
+        tile_player_tile_w = 0;
+        return "";
     }
-    else if (field == "playermons")
+    else if (field == "playermons") // same as mons:player
     {
-        tile_use_monster = MONS_PLAYER;
-        tile_player_tile = 0;
-        return;
+        tile_use_monster_w = MONS_PLAYER;
+        tile_player_tile_w = 0;
+        return "";
     }
 
     vector<string> fields = split_string(":", field);
     // Handle tile:<tile-name> values
     if (fields.size() == 2 && fields[0] == "tile")
     {
+        tileidx_t base_tile = 0;
         // A variant tile. We have to find the base tile to look this up inthe
         // tile index.
         if (isdigit(*(fields[1].rbegin())))
@@ -2468,45 +2473,37 @@ void game_options::set_player_tile(const string &field)
             string base_tname = fields[1];
             size_t found = base_tname.rfind('_');
             int offset = 0;
-            tileidx_t base_tile = 0;
             if (found != std::string::npos
                 && parse_int(fields[1].substr(found + 1).c_str(), offset))
             {
                 base_tname = base_tname.substr(0, found);
                 if (!tile_player_index(base_tname.c_str(), &base_tile))
                 {
-                    report_error("Can't find base tile \"%s\" of variant "
-                                 "tile \"%s\"", base_tname.c_str(),
-                                 fields[1].c_str());
-                    return;
+                    return make_stringf("Can't find base tile \"%s\" of"
+                                        " variant tile \"%s\"",
+                                        base_tname.c_str(), fields[1].c_str());
                 }
-                tile_player_tile = tileidx_mon_clamp(base_tile, offset);
+                tile_player_tile_w = tileidx_mon_clamp(base_tile, offset);
             }
         }
-        else if (!tile_player_index(fields[1].c_str(), &tile_player_tile))
-        {
-            report_error("Unknown tile: \"%s\"", fields[1].c_str());
-            return;
-        }
-        tile_use_monster = MONS_PLAYER;
+        else if (tile_player_index(fields[1].c_str(), &base_tile))
+            tile_player_tile_w = base_tile;
+        else
+            return make_stringf("Unknown tile: \"%s\"", fields[1].c_str());
+        tile_use_monster_w = MONS_PLAYER;
     }
     else if (fields.size() == 2 && fields[0] == "mons")
     {
         // Handle mons:<monster-name> values
         const monster_type m = _mons_class_by_string(fields[1]);
         if (m == MONS_0)
-            report_error("Unknown monster: \"%s\"", fields[1].c_str());
-        else
-        {
-            tile_use_monster = m;
-            tile_player_tile = 0;
-        }
+            return make_stringf("Unknown monster: \"%s\"", fields[1].c_str());
+        tile_use_monster_w = m;
+        tile_player_tile_w = 0;
     }
     else
-    {
-        report_error("Invalid setting for tile_player_tile: \"%s\"",
-                     field.c_str());
-    }
+        return make_stringf("Invalid setting: \"%s\"", field.c_str());
+    return "";
 }
 
 void game_options::set_tile_offsets(const string &field, bool set_shield)
@@ -3767,13 +3764,11 @@ void game_options::read_option_line(const string &str, bool runscript)
             report_error(possible_error.c_str(), orig_field.c_str());
     }
 #ifdef USE_TILE
-    else if (key == "tile_show_player_species" && field == "true")
+    else if (key == "tile_show_player_species"
+             && read_maybe_bool(field) == MB_TRUE)
     {
-        field = "playermons";
-        set_player_tile(field);
+        read_option_line("tile_player_tile = playermons", runscript);
     }
-    else if (key == "tile_player_tile")
-        set_player_tile(field);
     else if (key == "tile_weapon_offsets")
         set_tile_offsets(field, false);
     else if (key == "tile_shield_offsets")
