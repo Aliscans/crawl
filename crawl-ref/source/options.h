@@ -325,7 +325,6 @@ public:
     vector<pair<int, int> > stat_colour;
     vector<int> enemy_hp_colour;
 
-    vector<pair<text_pattern, bool> > force_autopickup;
     vector<text_pattern> note_monsters;  // Interesting monsters
     vector<text_pattern> note_messages;  // Interesting messages
     vector<pair<text_pattern, string> > autoinscriptions;
@@ -621,6 +620,9 @@ private:
     string_map     variables;
     set<string>    constants; // Variables that can't be changed
     set<string>    included;  // Files we've included already.
+
+    // Variables which GameOptions write to, but never read from.
+    // Other code should not write to them, so the public versions are const.
     int fire_items_start_w; // index of first item for fire command
     monster_type   tile_use_monster_w;
     tileidx_t      tile_player_tile_w;
@@ -629,7 +631,6 @@ private:
     int            tile_viewport_scale_w;
     int            tile_map_scale_w;
     char32_t cset_override_w[NUM_DCHAR_TYPES];
-
     // View options
     map<dungeon_feature_type, feature_def> feature_colour_overrides_w;
     map<dungeon_feature_type, FixedVector<char32_t, 2> >
@@ -641,6 +642,7 @@ private:
     vector<unsigned> fire_order_w;  // missile search order for 'f' command
     unordered_set<spell_type, hash<int>> fire_order_spell_w;
     unordered_set<ability_type, hash<int>> fire_order_ability_w;
+    vector<pair<text_pattern, bool> > force_autopickup_w;
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -663,6 +665,9 @@ public:
         &fire_order_spell = fire_order_spell_w;
     const unordered_set<ability_type, hash<int>>
         &fire_order_ability = fire_order_ability_w;
+    const vector<pair<text_pattern, bool> >
+        &force_autopickup = force_autopickup_w;
+
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
     void fixup_options();
@@ -713,6 +718,7 @@ private:
     string add_fire_order_slot(const string &s);
     string set_fire_order_spell(vector<string> &fields);
     string set_fire_order_ability(vector<string> &fields);
+    string set_autopickup_exceptions(vector<string> &fields);
     void set_menu_sort(string field);
     string set_display_char(vector<string>&fields);
     string set_feature(vector<string>&fields);

@@ -213,6 +213,8 @@ const vector<GameOption*> game_options::build_options_list()
         new StringGameOption(SIMPLE_NAME(sound_file_path), ""),
         new BoolGameOption(SIMPLE_NAME(one_SDL_sound_channel), false),
         new GameOptionHeading("Interface: Dropping and Picking up"),
+        new CustomListGameOption(&game_options::set_autopickup_exceptions,
+                                 {"autopickup_exceptions"}, this),
         new BoolGameOption(SIMPLE_NAME(pickup_thrown), true),
         new MultipleChoiceGameOption<int>(SIMPLE_NAME(assign_item_slot),
             SS_FORWARD, {{"forward", SS_FORWARD}, {"backward", SS_BACKWARD}}),
@@ -1384,7 +1386,6 @@ void game_options::reset_options()
     enemy_hp_colour.push_back(MAGENTA);
     enemy_hp_colour.push_back(RED);
 
-    force_autopickup.clear();
     autoinscriptions.clear();
     note_skill_levels.reset();
     note_skill_levels.set(1);
@@ -1699,6 +1700,43 @@ string game_options::add_fire_order_slot(const string &s)
     }
     if (flags)
         fire_order_w.push_back(flags);
+    return "";
+}
+
+// set_autopickup_exceptions has a separate "ban_pickup" mode.
+static rc_line_type _ban_pickup_line_type = NUM_RCFILE_LINE_TYPES;
+
+string game_options::set_autopickup_exceptions(vector<string> &fields)
+{
+    const bool is_ban_pickup = _ban_pickup_line_type != NUM_RCFILE_LINE_TYPES;
+    if (_ban_pickup_line_type == RCFILE_LINE_EQUALS)
+    {
+        erase_if(fields, [](const string &s)
+                         {
+                              auto n = s.find_first_not_of(" ");
+                              return n == s.npos || '<' != s.at(n);
+                         });
+    }
+
+    force_autopickup_w.clear();
+    for (auto field : fields)
+    {
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        pair<text_pattern, bool> f_a;
+        if (field[0] == '>' && !is_ban_pickup)
+            f_a = make_pair(field.substr(1), false);
+        else if (field[0] == '<' && !is_ban_pickup)
+            f_a = make_pair(field.substr(1), true);
+        else
+            f_a = make_pair(field, false);
+
+        if (remove)
+            remove_matching(force_autopickup_w, f_a);
+        else
+            force_autopickup_w.push_back(f_a);
+    }
     return "";
 }
 
@@ -3093,11 +3131,6 @@ static void _bindkey(string field)
     bind_command_to_key(cmd, key);
 }
 
-static bool _is_autopickup_ban(pair<text_pattern, bool> entry)
-{
-    return !entry.second;
-}
-
 void game_options::read_option_line(const string &str, bool runscript)
 {
 #define NEWGAME_OPTION(_opt, _conv, _type)                                     \
@@ -3443,51 +3476,18 @@ void game_options::read_option_line(const string &str, bool runscript)
 #endif
     else if (key == "ban_pickup")
     {
-        // Only remove negative, not positive, exceptions.
-        if (plain)
-            erase_if(force_autopickup, _is_autopickup_ban);
-
-        vector<pair<text_pattern, bool> > new_entries;
-        for (const string &s : split_string(",", field))
+        // XXX ban_pickup is a special autopickup_exceptions.
+        // "ban_pickup = ..." is extra special.
+        unwind_var<rc_line_type> bps(_ban_pickup_line_type, line_type);
+        auto *g = option_from_name("autopickup_exceptions");
+        if (RCFILE_LINE_EQUALS == line_type)
         {
-            if (s.empty())
-                continue;
-
-            const pair<text_pattern, bool> f_a(s, false);
-
-            if (minus_equal)
-                remove_matching(force_autopickup, f_a);
-            else
-                new_entries.push_back(f_a);
+            g->loadFromString("", RCFILE_LINE_PLUS);
+            _ban_pickup_line_type = RCFILE_LINE_PLUS;
+            g->loadFromString(field, RCFILE_LINE_PLUS);
         }
-        merge_lists(force_autopickup, new_entries, caret_equal);
-    }
-    else if (key == "autopickup_exceptions")
-    {
-        if (plain)
-            force_autopickup.clear();
-
-        vector<pair<text_pattern, bool> > new_entries;
-        for (const string &s : split_string(",", field))
-        {
-            if (s.empty())
-                continue;
-
-            pair<text_pattern, bool> f_a;
-
-            if (s[0] == '>')
-                f_a = make_pair(s.substr(1), false);
-            else if (s[0] == '<')
-                f_a = make_pair(s.substr(1), true);
-            else
-                f_a = make_pair(s, false);
-
-            if (minus_equal)
-                remove_matching(force_autopickup, f_a);
-            else
-                new_entries.push_back(f_a);
-        }
-        merge_lists(force_autopickup, new_entries, caret_equal);
+        else
+            g->loadFromString(field, line_type);
     }
 #ifndef _MSC_VER
     // break if-else chain on broken Microsoft compilers with stupid nesting limits
