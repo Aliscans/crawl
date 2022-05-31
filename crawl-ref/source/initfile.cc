@@ -402,6 +402,8 @@ const vector<GameOption*> game_options::build_options_list()
         (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
             ->set_on_change(_dirty_prefs),
         new GameOptionHeading("Interface: Inscriptions"),
+        new CustomListGameOption(&game_options::set_autoinscribe,
+                                 {"autoinscribe"}, this, "", "\n"),
         new MultipleChoiceGameOption<maybe_bool>(
             SIMPLE_NAME(show_god_gift), MB_MAYBE, MB_FALSE, MB_TRUE,
             {{"unidentified", MB_MAYBE}, {"unident", MB_MAYBE},
@@ -1386,7 +1388,6 @@ void game_options::reset_options()
     enemy_hp_colour.push_back(MAGENTA);
     enemy_hp_colour.push_back(RED);
 
-    autoinscriptions.clear();
     note_skill_levels.reset();
     note_skill_levels.set(1);
     note_skill_levels.set(5);
@@ -1738,6 +1739,47 @@ string game_options::set_autopickup_exceptions(vector<string> &fields)
             force_autopickup_w.push_back(f_a);
     }
     return "";
+}
+
+// NB - there is no separator; everything exists on separate lines.
+// Split with /\n/?
+string game_options::set_autoinscribe(vector<string> &fields)
+{
+    vector<string> errors;
+    autoinscriptions_w.clear();
+    for (string field : fields)
+    {
+        string error;
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        const size_t first = field.find(':');
+        if (field.npos == first)
+            error = "Missing :";
+        else if (field.npos != field.find(':', first+1))
+            error = "Too many :s";
+        else if (!first)
+            error = "No pattern before :";
+        else if (field.size() == 1+first)
+            error = "No inscription after :";
+        else
+        {
+            text_pattern pattern = trimmed_string(field.substr(0, first));
+            string inscrip = trimmed_string(field.substr(first+1));
+            pair<text_pattern,string> entry(pattern, inscrip);
+            if (remove)
+                remove_matching(autoinscriptions_w, entry);
+            else
+                autoinscriptions_w.push_back(entry);
+        }
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(autoinscribe) "+list;
 }
 
 void game_options::add_force_spell_targeter(const string &s, bool)
@@ -3494,50 +3536,7 @@ void game_options::read_option_line(const string &str, bool runscript)
     else
 #endif
 
-    if (key == "autoinscribe")
-    {
-        if (plain)
-            autoinscriptions.clear();
-
-        const size_t first = field.find_first_of(':');
-        const size_t last  = field.find_last_of(':');
-        if (first == string::npos || first != last)
-        {
-            return report_error("Autoinscribe string must have exactly "
-                                "one colon: %s\n", field.c_str());
-        }
-
-        if (first == 0)
-        {
-            report_error("Autoinscribe pattern is empty: %s\n", field.c_str());
-            return;
-        }
-
-        if (last == field.length() - 1)
-        {
-            report_error("Autoinscribe result is empty: %s\n", field.c_str());
-            return;
-        }
-
-        vector<string> thesplit = split_string(":", field);
-
-        if (thesplit.size() != 2)
-        {
-            report_error("Error parsing autoinscribe string: %s\n",
-                         field.c_str());
-            return;
-        }
-
-        pair<text_pattern,string> entry(thesplit[0], thesplit[1]);
-
-        if (minus_equal)
-            remove_matching(autoinscriptions, entry);
-        else if (caret_equal)
-            autoinscriptions.insert(autoinscriptions.begin(), entry);
-        else
-            autoinscriptions.push_back(entry);
-    }
-    else if (key == "enemy_hp_colour" || key == "enemy_hp_color")
+    if (key == "enemy_hp_colour" || key == "enemy_hp_color")
     {
         if (plain)
             enemy_hp_colour.clear();
@@ -5751,6 +5750,9 @@ static string _option_line(const GameOption *option, int name_len, int text_len)
     auto name0 = option->name(), value0 = option->str();
     if ((unsigned)text_len < value0.size())
         value0.erase(0, value0.size()-text_len+3).insert(0, "...");
+    for (char &c : value0)
+        if (iscntrl(c))
+            c = ' ';
     value0 = replace_all(value0, "<", "<<");
     auto name = name0.c_str(), value = value0.c_str();
     return make_stringf("%-*.*s<%s>%s</%s>", name_len, name_len, name,

@@ -327,7 +327,6 @@ public:
 
     vector<text_pattern> note_monsters;  // Interesting monsters
     vector<text_pattern> note_messages;  // Interesting messages
-    vector<pair<text_pattern, string> > autoinscriptions;
     vector<text_pattern> note_items;     // Objects to note
     // Skill levels to note
     FixedBitVector<MAX_SKILL_LEVEL + 1> note_skill_levels;
@@ -643,6 +642,7 @@ private:
     unordered_set<spell_type, hash<int>> fire_order_spell_w;
     unordered_set<ability_type, hash<int>> fire_order_ability_w;
     vector<pair<text_pattern, bool> > force_autopickup_w;
+    vector<pair<text_pattern, string> > autoinscriptions_w;
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -667,6 +667,8 @@ public:
         &fire_order_ability = fire_order_ability_w;
     const vector<pair<text_pattern, bool> >
         &force_autopickup = force_autopickup_w;
+    const vector<pair<text_pattern, string> >
+        &autoinscriptions = autoinscriptions_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -719,6 +721,7 @@ private:
     string set_fire_order_spell(vector<string> &fields);
     string set_fire_order_ability(vector<string> &fields);
     string set_autopickup_exceptions(vector<string> &fields);
+    string set_autoinscribe(vector<string> &fields);
     void set_menu_sort(string field);
     string set_display_char(vector<string>&fields);
     string set_feature(vector<string>&fields);
