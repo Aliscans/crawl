@@ -323,7 +323,6 @@ public:
     vector<pair<int, int> > hp_colour;
     vector<pair<int, int> > mp_colour;
     vector<pair<int, int> > stat_colour;
-    vector<int> enemy_hp_colour;
 
     vector<text_pattern> note_monsters;  // Interesting monsters
     vector<text_pattern> note_messages;  // Interesting messages
@@ -643,6 +642,7 @@ private:
     unordered_set<ability_type, hash<int>> fire_order_ability_w;
     vector<pair<text_pattern, bool> > force_autopickup_w;
     vector<pair<text_pattern, string> > autoinscriptions_w;
+    vector<int> enemy_hp_colour_w;
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -669,6 +669,7 @@ public:
         &force_autopickup = force_autopickup_w;
     const vector<pair<text_pattern, string> >
         &autoinscriptions = autoinscriptions_w;
+    const vector<int> &enemy_hp_colour = enemy_hp_colour_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -727,7 +728,7 @@ private:
     string set_feature(vector<string>&fields);
     string set_mon_glyph(vector<string> &fields);
     string set_item_glyph(vector<string> &fields);
-    void str_to_enemy_hp_colour(const string &, bool);
+    string set_enemy_hp_colour(vector<string> &fields);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
     void do_kill_map(const string &from, const string &to);

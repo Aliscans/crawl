@@ -5,7 +5,7 @@
  * most of the work though. Read through read_init_file to get an overview of
  * how Crawl loads options. This file also contains a large number of utility
  * functions for setting particular options and converting between human
- * readable strings and internal values. (E.g. str_to_enemy_hp_colour,
+ * readable strings and internal values. (E.g. set_enemy_hp_colour,
  * _weapon_to_str). There is also some code dealing with sorting menus.
 **/
 
@@ -142,11 +142,21 @@ static void _rcfile_no_caret(rc_line_type &rc)
         rc = RCFILE_LINE_PLUS;
 }
 
-static void _rcfile_no_minus(rc_line_type &rc)
+static void _rcfile_minus_to_equal(rc_line_type &rc)
 {
     if (rc == RCFILE_LINE_MINUS)
         rc = RCFILE_LINE_EQUALS;
 }
+
+static void _rcfile_minus_to_plus(rc_line_type &rc)
+{
+    if (rc == RCFILE_LINE_MINUS)
+        rc = RCFILE_LINE_PLUS;
+}
+
+const vector<colour_t> _ehc_list = {GREEN, GREEN, BROWN, BROWN, MAGENTA, RED};
+const string _enemy_hp_colour_default = comma_separated_fn(
+    _ehc_list.begin(), _ehc_list.end(), colour_to_str, " ", " ");
 
 const vector<GameOption*> game_options::build_options_list()
 {
@@ -325,6 +335,9 @@ const vector<GameOption*> game_options::build_options_list()
         new ColourThresholdOption(stat_colour, {"stat_colour", "stat_color"},
                                   "3:red", _first_less),
         new ColourGameOption(SIMPLE_NAME(status_caption_colour), BROWN),
+        new CustomListGameOption(&game_options::set_enemy_hp_colour,
+                                 _rcfile_minus_to_plus, {"enemy_hp_colour"},
+                                 this, _enemy_hp_colour_default, " "),
         new BoolGameOption(SIMPLE_NAME(clear_messages), false),
 #ifdef DEBUG
         new BoolGameOption(SIMPLE_NAME(show_more), false),
@@ -382,7 +395,7 @@ const vector<GameOption*> game_options::build_options_list()
         new CustomStringGameOption(&game_options::set_fire_items_start,
                                    {"fire_items_start"}, this, "a"),
         new CustomListGameOption(&game_options::set_fire_order,
-                                 _rcfile_no_minus, {"fire_order"}, this,
+                                 _rcfile_minus_to_equal, {"fire_order"}, this,
                                  "launcher,throwing,inscribed,spell"
                                   ",evokable,ability"),
         new CustomListGameOption(&game_options::set_fire_order_spell,
@@ -987,24 +1000,22 @@ static int _read_bool_or_number(const string &field, int def_value,
     return ret;
 }
 
-void game_options::str_to_enemy_hp_colour(const string &colours, bool prepend)
+string game_options::set_enemy_hp_colour(vector<string> &fields)
 {
-    vector<string> colour_list = split_string(" ", colours, true, true);
-    if (prepend)
-        reverse(colour_list.begin(), colour_list.end());
-    for (const string &colstr : colour_list)
+    vector<string> errors;
+    enemy_hp_colour_w.clear();
+    for (const string &colstr : fields)
     {
         const int col = str_to_colour(colstr);
         if (col < 0)
-        {
-            Options.report_error("Bad enemy_hp_colour: %s\n", colstr.c_str());
-            return;
-        }
-        else if (prepend)
-            enemy_hp_colour.insert(enemy_hp_colour.begin(), col);
+            errors.emplace_back(colstr);
         else
-            enemy_hp_colour.push_back(col);
+            enemy_hp_colour_w.push_back(col);
     }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(enemy_hp_colour) Bad colour(s): "+list;
 }
 
 #ifdef USE_TILE
@@ -1377,16 +1388,6 @@ void game_options::reset_options()
     use_animations = (UA_BEAM | UA_RANGE | UA_HP | UA_MONSTER_IN_SIGHT
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
                       | UA_ALWAYS_ON);
-
-    enemy_hp_colour.clear();
-    // I think these defaults are pretty ugly but apparently OS X has problems
-    // with lighter colours
-    enemy_hp_colour.push_back(GREEN);
-    enemy_hp_colour.push_back(GREEN);
-    enemy_hp_colour.push_back(BROWN);
-    enemy_hp_colour.push_back(BROWN);
-    enemy_hp_colour.push_back(MAGENTA);
-    enemy_hp_colour.push_back(RED);
 
     note_skill_levels.reset();
     note_skill_levels.set(1);
@@ -3536,13 +3537,7 @@ void game_options::read_option_line(const string &str, bool runscript)
     else
 #endif
 
-    if (key == "enemy_hp_colour" || key == "enemy_hp_color")
-    {
-        if (plain)
-            enemy_hp_colour.clear();
-        str_to_enemy_hp_colour(field, caret_equal);
-    }
-    else if (key == "monster_list_colour" || key == "monster_list_color")
+    if (key == "monster_list_colour" || key == "monster_list_color")
     {
         if (plain)
             clear_monster_list_colours();
