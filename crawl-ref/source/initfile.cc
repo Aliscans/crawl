@@ -5769,6 +5769,8 @@ public:
         string prompt = "Search for what? (regex, leave blank to show all)";
         char select[1024];
         auto old_search_pat = search_pat;
+        int new_hovered = -1;
+        vector<MenuEntry*> chosen_items;
         while (1)
         {
             if (msgwin_get_line(prompt, select, sizeof(select), nullptr,
@@ -5779,11 +5781,13 @@ public:
                 return CK_NO_KEY;
             }
             search_pat = select;
-            vector<MenuEntry*> chosen_items;
             MenuEntry *heading = nullptr;
+            bool found_hover = false;
             int i = 0;
             for (auto entry : all_items)
             {
+                if (entry == items[last_hovered])
+                    found_hover = true;
                 auto g = static_cast<GameOption*>(entry->data);
                 if (!g)
                     heading = entry;
@@ -5792,29 +5796,36 @@ public:
                     if (heading)
                         chosen_items.emplace_back(heading);
                     heading = nullptr;
+                    if (found_hover && new_hovered < 0)
+                        new_hovered = chosen_items.size();
                     entry->hotkeys[0] = index_to_letter((i++)%52);
                     chosen_items.emplace_back(entry);
                 }
             }
             if (!chosen_items.empty())
-            {
-                items = chosen_items;
-                string new_title = base_title;
-                if (!search_pat.empty())
-                {
-                    string search = search_pat.tostring();
-                    if (search.length() > 42)
-                        search = search.substr(39)+"...";
-                    search = replace_all(search, "<", "<<");
-                    new_title += " <h>(Matches \""+search+"\")</h>";
-                }
-                set_title(new MenuEntry(new_title, MEL_TITLE));
-                update_menu(true);
-                return CK_NO_KEY;
-            }
+                break;
 
             show_type_response("No option names match.");
         }
+
+        items = chosen_items;
+        string new_title = base_title;
+        if (!search_pat.empty())
+        {
+            string search = search_pat.tostring();
+            if (search.length() > 42)
+                search = search.substr(39)+"...";
+            search = replace_all(search, "<", "<<");
+            new_title += " <h>(Matches \""+search+"\")</h>";
+        }
+        set_title(new MenuEntry(new_title, MEL_TITLE));
+        reset();
+        update_menu(true);
+        if (new_hovered < 0)
+            set_hovered(all_items.size()-1);
+        else
+            set_hovered(new_hovered);
+        return CK_NO_KEY;
     }
 
     string get_keyhelp(bool) const override
