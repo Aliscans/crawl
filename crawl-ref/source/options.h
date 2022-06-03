@@ -240,10 +240,6 @@ public:
     easy_confirm_type easy_confirm;    // make yesno() confirming easier
     confirm_prompt_type allow_self_target;      // yes, no, prompt
     bool        simple_targeting; // disable smart spell targeting
-    bool        always_use_static_spell_targeters; // whether to always use
-                                                   // static spell targeters
-    bool        always_use_static_ability_targeters; // whether to always use
-                                                     // static ability targeters
 
     int         colour[16];      // macro fg colours to other colours
     unsigned    background_colour; // select default background colour
@@ -285,11 +281,6 @@ public:
 
     bool        quiver_menu_focus;
     bool        launcher_autoquiver;
-
-    unordered_set<int> force_spell_targeter; // spell types to always use a
-                                             // targeter for
-    unordered_set<int> force_ability_targeter; // ability types to always use a
-                                               // targeter for
 
     bool        flush_input[NUM_FLUSH_REASONS]; // when to flush input buff
 
@@ -634,6 +625,15 @@ private:
     vector<pair<text_pattern, string> > autoinscriptions_w;
     vector<int> enemy_hp_colour_w;
     FixedBitVector<MAX_SKILL_LEVEL + 1> note_skill_levels_w;
+    unordered_set<int> force_spell_targeter_w;   // spell types to always use a
+                                                 // targeter for
+    bool always_use_static_spell_targeters_w;    // whether to always use
+                                                 // static spell targeters
+    unordered_set<int> force_ability_targeter_w; // ability types to always use
+                                                 // a targeter for
+    bool always_use_static_ability_targeters_w;  // whether to always use
+                                                 // static ability targeters
+
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -663,6 +663,12 @@ public:
     const vector<int> &enemy_hp_colour = enemy_hp_colour_w;
     const FixedBitVector<MAX_SKILL_LEVEL + 1>
         &note_skill_levels = note_skill_levels_w;
+    const unordered_set<int> &force_spell_targeter = force_spell_targeter_w;
+    const bool &always_use_static_spell_targeters
+        = always_use_static_spell_targeters_w;
+    const unordered_set<int> &force_ability_targeter = force_ability_targeter_w;
+    const bool &always_use_static_ability_targeters
+        = always_use_static_ability_targeters_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -723,6 +729,8 @@ private:
     string set_item_glyph(vector<string> &fields);
     string set_enemy_hp_colour(vector<string> &fields);
     string set_note_skill_levels(vector<string> &fields);
+    string set_force_spell_targeter(vector<string> &fields);
+    string set_force_ability_targeter(vector<string> &fields);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
     void do_kill_map(const string &from, const string &to);
@@ -743,10 +751,10 @@ private:
     string set_player_tile(const string &s);
     string set_tile_weapon_offsets(const string &s);
     string set_tile_shield_offsets(const string &s);
-    void add_force_spell_targeter(const string &s, bool prepend);
-    void remove_force_spell_targeter(const string &s, bool prepend);
-    void add_force_ability_targeter(const string &s, bool prepend);
-    void remove_force_ability_targeter(const string &s, bool prepend);
+    string add_force_spell_targeter(const string &s);
+    string remove_force_spell_targeter(const string &s);
+    string add_force_ability_targeter(const string &s);
+    string remove_force_ability_targeter(const string &s);
 
     static const string interrupt_prefix;
 
