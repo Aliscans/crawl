@@ -328,7 +328,6 @@ public:
     vector<text_pattern> note_messages;  // Interesting messages
     vector<text_pattern> note_items;     // Objects to note
     // Skill levels to note
-    FixedBitVector<MAX_SKILL_LEVEL + 1> note_skill_levels;
     vector<pair<text_pattern, string>> auto_spell_letters;
     vector<pair<text_pattern, string>> auto_item_letters;
     vector<pair<text_pattern, string>> auto_ability_letters;
@@ -643,6 +642,7 @@ private:
     vector<pair<text_pattern, bool> > force_autopickup_w;
     vector<pair<text_pattern, string> > autoinscriptions_w;
     vector<int> enemy_hp_colour_w;
+    FixedBitVector<MAX_SKILL_LEVEL + 1> note_skill_levels_w;
 public:
     const int &fire_items_start = fire_items_start_w;
     const monster_type &tile_use_monster = tile_use_monster_w;
@@ -670,6 +670,8 @@ public:
     const vector<pair<text_pattern, string> >
         &autoinscriptions = autoinscriptions_w;
     const vector<int> &enemy_hp_colour = enemy_hp_colour_w;
+    const FixedBitVector<MAX_SKILL_LEVEL + 1>
+        &note_skill_levels = note_skill_levels_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -729,6 +731,7 @@ private:
     string set_mon_glyph(vector<string> &fields);
     string set_item_glyph(vector<string> &fields);
     string set_enemy_hp_colour(vector<string> &fields);
+    string set_note_skill_levels(vector<string> &fields);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
     void do_kill_map(const string &from, const string &to);

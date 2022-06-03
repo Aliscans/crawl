@@ -577,6 +577,9 @@ const vector<GameOption*> game_options::build_options_list()
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_items)),
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_monsters)),
         new IntGameOption(SIMPLE_NAME(note_hp_percent), 5, 0, 100),
+        new CustomListGameOption(&game_options::set_note_skill_levels,
+                                 _rcfile_no_caret, {"note_skill_levels"}, this,
+                                 "1,5,10,15,27"),
         new BoolGameOption(SIMPLE_NAME(note_all_skill_levels), false),
         new BoolGameOption(SIMPLE_NAME(note_skill_max), true),
         new BoolGameOption(SIMPLE_NAME(note_xom_effects), true),
@@ -1019,6 +1022,33 @@ string game_options::set_enemy_hp_colour(vector<string> &fields)
     return "(enemy_hp_colour) Bad colour(s): "+list;
 }
 
+string game_options::set_note_skill_levels(vector<string> &fields)
+{
+    vector<string> errors;
+    note_skill_levels_w.reset();
+    for (const string &field : fields)
+    {
+        string error;
+        char *end;
+        bool remove = ' ' == field[0];
+        long num = strtol(field.c_str(), &end, 0);
+        if (*end)
+            error = string()+"Unknown characters \""+end+"\"";
+        else if (num <= 0)
+            error = "number below 1";
+        else if (num > MAX_SKILL_LEVEL)
+            error = "number above "+to_string(MAX_SKILL_LEVEL);
+        else
+            note_skill_levels_w.set(num, !remove);
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(note_skill_levels) "+list;
+}
+
 #ifdef USE_TILE
 static FixedVector<const char*, TAGPREF_MAX>
     tag_prefs("none", "tutorial", "named", "enemy");
@@ -1390,12 +1420,6 @@ void game_options::reset_options()
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
                       | UA_ALWAYS_ON);
 
-    note_skill_levels.reset();
-    note_skill_levels.set(1);
-    note_skill_levels.set(5);
-    note_skill_levels.set(10);
-    note_skill_levels.set(15);
-    note_skill_levels.set(27);
     auto_spell_letters.clear();
     auto_item_letters.clear();
     auto_ability_letters.clear();
@@ -3574,24 +3598,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         }
     }
 
-    else if (key == "note_skill_levels")
-    {
-        if (plain)
-            note_skill_levels.reset();
-        vector<string> thesplit = split_string(",", field);
-        for (unsigned i = 0; i < thesplit.size(); ++i)
-        {
-            int num = atoi(thesplit[i].c_str());
-            if (num > 0 && num <= 27)
-                note_skill_levels.set(num, !minus_equal);
-            else
-            {
-                report_error("Bad skill level to note -- %s\n",
-                             thesplit[i].c_str());
-                continue;
-            }
-        }
-    }
     else if (key == "force_spell_targeter")
     {
         // first pass through the rc file happens before the spell name cache
