@@ -14,7 +14,6 @@
 #include "stringutil.h"
 #include "maybe-bool.h"
 #include "menu.h"
-#include "unwind.h"
 
 using std::vector;
 struct game_options;
