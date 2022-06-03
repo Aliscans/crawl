@@ -25,15 +25,6 @@
 
 using std::vector;
 
-enum autosac_type
-{
-    AS_NO,
-    AS_YES,
-    AS_PROMPT,
-    AS_BEFORE_EXPLORE,
-    AS_PROMPT_IGNORE,
-};
-
 struct message_filter
 {
     int             channel;        // Use -1 to match any channel.
