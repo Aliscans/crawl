@@ -407,6 +407,10 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(default_show_all_skills), false),
         new IntGameOption(SIMPLE_NAME(view_delay), DEFAULT_VIEW_DELAY, 0),
         new BoolGameOption(SIMPLE_NAME(darken_beyond_range), true),
+        new CustomListGameOption(&game_options::set_force_more_message,
+                                 {"force_more_message"}, this),
+        new CustomListGameOption(&game_options::set_flash_screen_message,
+                                 {"flash_screen_message"}, this),
         new BoolGameOption(SIMPLE_NAME(cloud_status), !is_tiles()),
         new BoolGameOption(SIMPLE_NAME(always_show_zot), false),
 #ifdef USE_TILE_WEB
@@ -775,8 +779,8 @@ static const string message_channel_names[] =
     "dgl_message",
 };
 
-// returns -1 if unmatched else returns 0--(NUM_MESSAGE_CHANNELS-1)
-int str_to_channel(const string &str)
+// returns 0--(NUM_MESSAGE_CHANNELS-1) if matched else returns def_value (or -1)
+int str_to_channel(const string &str, int def_value)
 {
     COMPILE_CHECK(ARRAYSZ(message_channel_names) == NUM_MESSAGE_CHANNELS);
 
@@ -792,7 +796,7 @@ int str_to_channel(const string &str)
             return ret;
     }
 
-    return -1;
+    return def_value;
 }
 
 string channel_to_str(int channel)
@@ -1196,6 +1200,60 @@ string game_options::set_ability_slot(vector<string> &fields)
     return _set_slot(fields, "ability_slot", auto_ability_letters_w);
 }
 
+static string _set_messages(vector<string> &fields, const string &name,
+                            vector<message_filter> &filters)
+{
+    vector<string> errors;
+    filters.clear();
+    for (string field : fields)
+    {
+        string error;
+        message_filter mf("");
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+        const size_t first = field.find(':');
+
+        if (field.npos == first)
+            mf = field;
+        else if (!first)
+            error = "No channel before :";
+        else if (field.size() == 1+first)
+            error = "No pattern after :";
+        else
+        {
+            const string chan = field.substr(0, first);
+            const string pattern = field.substr(first+1);
+            int channel = chan == "any" ? -1 : str_to_channel(chan, -2);
+            if (-2 == channel)
+                error = "Unknown channel \""+chan+"\"";
+            else
+                mf = message_filter(channel, pattern);
+        }
+
+        if (!error.empty())
+            errors.emplace_back(error);
+        else if (remove)
+            remove_matching(filters, mf);
+        else
+            filters.push_back(mf);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "("+name+") "+list;
+}
+
+string game_options::set_force_more_message(vector<string> &fields)
+{
+    return _set_messages(fields, "force_more_message", force_more_message_w);
+}
+
+string game_options::set_flash_screen_message(vector<string> &fields)
+{
+    return _set_messages(fields, "flash_screen_message",
+                         flash_screen_message_w);
+}
+
 #ifdef USE_TILE
 static FixedVector<const char*, TAGPREF_MAX>
     tag_prefs("none", "tutorial", "named", "enemy");
@@ -1552,8 +1610,6 @@ void game_options::reset_options()
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
                       | UA_ALWAYS_ON);
 
-    force_more_message.clear();
-    flash_screen_message.clear();
     sound_mappings.clear();
     menu_colour_mappings.clear();
     message_colour_mappings.clear();
@@ -3732,39 +3788,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         for (const string &frag : split_string(";", field))
             if (!frag.empty())
                 set_menu_sort(frag);
-    }
-    else if (key == "force_more_message" || key == "flash_screen_message")
-    {
-        vector<message_filter> &filters = (key == "force_more_message" ? force_more_message : flash_screen_message);
-        if (plain)
-            filters.clear();
-
-        vector<message_filter> new_entries;
-        for (const string &fragment : split_string(",", field))
-        {
-            if (fragment.empty())
-                continue;
-
-            message_filter mf(fragment);
-
-            string::size_type pos = fragment.find(":");
-            if (pos && pos != string::npos)
-            {
-                string prefix = fragment.substr(0, pos);
-                int channel = str_to_channel(prefix);
-                if (channel != -1 || prefix == "any")
-                {
-                    string s = fragment.substr(pos + 1);
-                    mf = message_filter(channel, trim_string(s));
-                }
-            }
-
-            if (minus_equal)
-                remove_matching(filters, mf);
-            else
-                new_entries.push_back(mf);
-        }
-        merge_lists(filters, new_entries, caret_equal);
     }
     else if (key == "travel_avoid_terrain")
     {

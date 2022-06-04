@@ -83,7 +83,7 @@ void save_game_prefs();
 
 string channel_to_str(int ch);
 
-int str_to_channel(const string &);
+int str_to_channel(const string &, int def_value = -1);
 weapon_type str_to_weapon(const string &str);
 
 class StringLineInput : public LineInput

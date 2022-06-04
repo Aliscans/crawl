@@ -323,8 +323,6 @@ public:
     bool        arena_dump_msgs_all;
     bool        arena_list_eq;
 
-    vector<message_filter> force_more_message;
-    vector<message_filter> flash_screen_message;
     vector<text_pattern> confirm_action;
 
     unsigned    tc_reachable;   // Colour for squares that are reachable
@@ -633,6 +631,8 @@ private:
     vector<pair<text_pattern, string>> auto_spell_letters_w;
     vector<pair<text_pattern, string>> auto_item_letters_w;
     vector<pair<text_pattern, string>> auto_ability_letters_w;
+    vector<message_filter> force_more_message_w;
+    vector<message_filter> flash_screen_message_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -675,6 +675,8 @@ public:
         &auto_item_letters = auto_item_letters_w;
     const vector<pair<text_pattern, string>>
         &auto_ability_letters = auto_ability_letters_w;
+    const vector<message_filter> &force_more_message = force_more_message_w;
+    const vector<message_filter> &flash_screen_message = flash_screen_message_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -742,6 +744,8 @@ private:
     string set_spell_slot(vector<string> &fields);
     string set_item_slot(vector<string> &fields);
     string set_ability_slot(vector<string> &fields);
+    string set_force_more_message(vector<string> &fields);
+    string set_flash_screen_message(vector<string> &fields);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
     void do_kill_map(const string &from, const string &to);
