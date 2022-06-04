@@ -379,7 +379,6 @@ public:
 
     bool        travel_one_unsafe_move; // Allow one unsafe move of auto travel
 
-    vector<sound_mapping> sound_mappings;
     string sound_file_path;
     vector<colour_mapping> menu_colour_mappings;
     vector<message_colour_mapping> message_colour_mappings;
@@ -634,6 +633,7 @@ private:
     vector<message_filter> force_more_message_w;
     vector<message_filter> flash_screen_message_w;
     FixedVector<int8_t,NUM_FEATURES> forbidden_terrain_w;
+    vector<sound_mapping> sound_mappings_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -680,6 +680,7 @@ public:
     const vector<message_filter> &flash_screen_message = flash_screen_message_w;
     const FixedVector<int8_t,NUM_FEATURES>
         &forbidden_terrain = forbidden_terrain_w;
+    const vector<sound_mapping> &sound_mappings = sound_mappings_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -750,6 +751,7 @@ private:
     string set_force_more_message(vector<string> &fields);
     string set_flash_screen_message(vector<string> &fields);
     string set_travel_avoid_terrain(vector<string> &fields);
+    string set_sound(vector<string> &fields);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
     void do_kill_map(const string &from, const string &to);

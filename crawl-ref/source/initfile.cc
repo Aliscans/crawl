@@ -246,6 +246,7 @@ const vector<GameOption*> game_options::build_options_list()
                              _get_save_path("morgue/")),
 #endif
         new BoolGameOption(SIMPLE_NAME(sounds_on), true),
+        new CustomListGameOption(&game_options::set_sound, {"sound"}, this),
         new StringGameOption(SIMPLE_NAME(sound_file_path), ""),
         new BoolGameOption(SIMPLE_NAME(one_SDL_sound_channel), false),
         new GameOptionHeading("Interface: Dropping and Picking up"),
@@ -1281,6 +1282,50 @@ string game_options::set_travel_avoid_terrain(vector<string> &fields)
     return "(travel_avoid_terrain) "+list;
 }
 
+string game_options::set_sound(vector<string> &fields)
+{
+    const char* hold_string = "hold:";
+    vector<string> errors;
+    sound_mappings_w.clear();
+
+    for (string field : fields)
+    {
+        string error;
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+        int hold = lowercase_string(field.substr(0, strlen(hold_string)))
+                   .compare(hold_string) ? 0 : 1;
+        field.erase(0, hold*strlen(hold_string));
+
+        const size_t first = field.find(':');
+        if (field.npos == first)
+            error = "Missing :";
+        else if (field.npos != field.find(':', first+1))
+            error = "Too many :s";
+        else if (!first)
+            error = "No pattern before :";
+        else if (field.size() == 1+first)
+            error = "No filename after :";
+        else
+        {
+            text_pattern pattern = field.substr(0, first);
+            string soundfile = field.substr(first+1);
+            sound_mapping entry = {pattern, soundfile, (bool)hold};
+            if (remove)
+                remove_matching(sound_mappings_w, entry);
+            else
+                sound_mappings_w.push_back(entry);
+        }
+
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(sound) "+list;
+}
+
 #ifdef USE_TILE
 static FixedVector<const char*, TAGPREF_MAX>
     tag_prefs("none", "tutorial", "named", "enemy");
@@ -1637,7 +1682,6 @@ void game_options::reset_options()
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
                       | UA_ALWAYS_ON);
 
-    sound_mappings.clear();
     menu_colour_mappings.clear();
     message_colour_mappings.clear();
     named_options.clear();
@@ -3411,6 +3455,14 @@ static void _bindkey(string field)
     bind_command_to_key(cmd, key);
 }
 
+static const map<rc_line_type, string> rc_line_strings =
+{
+    {RCFILE_LINE_EQUALS, "="},
+    {RCFILE_LINE_PLUS, "+="},
+    {RCFILE_LINE_MINUS, "-="},
+    {RCFILE_LINE_CARET, "^="},
+};
+
 void game_options::read_option_line(const string &str, bool runscript)
 {
 #define NEWGAME_OPTION(_opt, _conv, _type)                                     \
@@ -3827,33 +3879,8 @@ void game_options::read_option_line(const string &str, bool runscript)
         else
             explore_stop |= new_conditions;
     }
-    else if (key == "sound" || key == "hold_sound")
-    {
-        if (plain)
-            sound_mappings.clear();
-
-        vector<sound_mapping> new_entries;
-        for (const string &sub : split_string(",", field))
-        {
-            string::size_type cpos = sub.find(":", 0);
-            if (cpos != string::npos)
-            {
-                sound_mapping entry;
-                entry.pattern = sub.substr(0, cpos);
-                entry.soundfile = sound_file_path + sub.substr(cpos + 1);
-                if (key == "hold_sound")
-                    entry.interrupt_game = true;
-                else
-                    entry.interrupt_game = false;
-
-                if (minus_equal)
-                    remove_matching(sound_mappings, entry);
-                else
-                    new_entries.push_back(entry);
-            }
-        }
-        merge_lists(sound_mappings, new_entries, caret_equal);
-    }
+    else if (key == "hold_sound")
+        read_option_line("sound"+rc_line_strings.at(line_type)+"hold:"+field);
 #ifndef TARGET_COMPILER_VC
     // MSVC has a limit on how many if/else if can be chained together.
     else
