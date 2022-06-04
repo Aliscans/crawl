@@ -297,6 +297,8 @@ const vector<GameOption*> game_options::build_options_list()
         new IntGameOption(SIMPLE_NAME(explore_delay), -1, -1, 2000),
         new IntGameOption(SIMPLE_NAME(rest_delay), USING_DGL ? -1 : 0,
                           -1, 2000),
+        new CustomListGameOption(&game_options::set_travel_avoid_terrain,
+                                 {"travel_avoid_terrain"}, this),
         new BoolGameOption(SIMPLE_NAME(explore_greedy), true),
         new ListGameOption<text_pattern>(SIMPLE_NAME(explore_stop_pickup_ignore)),
         new IntGameOption(SIMPLE_NAME(explore_wall_bias), 0, 0, 1000),
@@ -1252,6 +1254,31 @@ string game_options::set_flash_screen_message(vector<string> &fields)
 {
     return _set_messages(fields, "flash_screen_message",
                          flash_screen_message_w);
+}
+
+string game_options::set_travel_avoid_terrain(vector<string> &fields)
+{
+    vector<string> errors;
+    forbidden_terrain_w.init(0);
+
+    for (string field : fields)
+    {
+        string error;
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        const auto feats = features_by_desc(text_pattern(field));
+        if (feats.empty() && get_feature_def(DNGN_FLOOR).feat == DNGN_FLOOR)
+            error = "No features match the pattern";
+        for (const dungeon_feature_type feat : feats)
+            forbidden_terrain_w[feat] = 1-remove;
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(travel_avoid_terrain) "+list;
 }
 
 #ifdef USE_TILE
@@ -3788,12 +3815,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         for (const string &frag : split_string(";", field))
             if (!frag.empty())
                 set_menu_sort(frag);
-    }
-    else if (key == "travel_avoid_terrain")
-    {
-        // TODO: allow resetting (need reset_forbidden_terrain())
-        for (const string &seg : split_string(",", field))
-            prevent_travel_to(seg);
     }
     else if (key == "explore_stop")
     {
