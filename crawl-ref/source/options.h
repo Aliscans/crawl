@@ -309,10 +309,6 @@ public:
     vector<text_pattern> note_monsters;  // Interesting monsters
     vector<text_pattern> note_messages;  // Interesting messages
     vector<text_pattern> note_items;     // Objects to note
-    // Skill levels to note
-    vector<pair<text_pattern, string>> auto_spell_letters;
-    vector<pair<text_pattern, string>> auto_item_letters;
-    vector<pair<text_pattern, string>> auto_ability_letters;
 
     bool        pickup_thrown;  // Pickup thrown missiles
     int         travel_delay;   // How long to pause between travel moves
@@ -624,6 +620,7 @@ private:
     vector<pair<text_pattern, bool> > force_autopickup_w;
     vector<pair<text_pattern, string> > autoinscriptions_w;
     vector<int> enemy_hp_colour_w;
+    // Skill levels to note
     FixedBitVector<MAX_SKILL_LEVEL + 1> note_skill_levels_w;
     unordered_set<int> force_spell_targeter_w;   // spell types to always use a
                                                  // targeter for
@@ -633,6 +630,9 @@ private:
                                                  // a targeter for
     bool always_use_static_ability_targeters_w;  // whether to always use
                                                  // static ability targeters
+    vector<pair<text_pattern, string>> auto_spell_letters_w;
+    vector<pair<text_pattern, string>> auto_item_letters_w;
+    vector<pair<text_pattern, string>> auto_ability_letters_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -669,6 +669,12 @@ public:
     const unordered_set<int> &force_ability_targeter = force_ability_targeter_w;
     const bool &always_use_static_ability_targeters
         = always_use_static_ability_targeters_w;
+    const vector<pair<text_pattern, string>>
+        &auto_spell_letters = auto_spell_letters_w;
+    const vector<pair<text_pattern, string>>
+        &auto_item_letters = auto_item_letters_w;
+    const vector<pair<text_pattern, string>>
+        &auto_ability_letters = auto_ability_letters_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -731,6 +737,11 @@ private:
     string set_note_skill_levels(vector<string> &fields);
     string set_force_spell_targeter(vector<string> &fields);
     string set_force_ability_targeter(vector<string> &fields);
+    string set_thingy_slot(vector<string> &fields, const string &name,
+                           vector<pair<text_pattern, string>> &auto_letters);
+    string set_spell_slot(vector<string> &fields);
+    string set_item_slot(vector<string> &fields);
+    string set_ability_slot(vector<string> &fields);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
     void do_kill_map(const string &from, const string &to);

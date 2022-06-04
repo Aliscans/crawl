@@ -346,6 +346,12 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(ability_menu), true),
         new BoolGameOption(SIMPLE_NAME(spell_menu), false),
         new BoolGameOption(SIMPLE_NAME(easy_floor_use), false),
+        new CustomListGameOption(&game_options::set_spell_slot,
+                                 {"spell_slot"}, this, "", "\n"),
+        new CustomListGameOption(&game_options::set_item_slot,
+                                 {"item_slot"}, this, "", "\n"),
+        new CustomListGameOption(&game_options::set_ability_slot,
+                                 {"ability_slot"}, this, "", "\n"),
         new IntGameOption(SIMPLE_NAME(autofight_warning), 0, 0, 1000),
         new IntGameOption(SIMPLE_NAME(fail_severity_to_confirm), 3, -1, 5),
         new BoolGameOption(SIMPLE_NAME(easy_door), true),
@@ -1128,6 +1134,68 @@ string game_options::set_force_ability_targeter(vector<string> &fields)
 
 }
 
+static string _set_slot(vector<string> &fields, const string &name,
+                        vector<pair<text_pattern, string>> &auto_letters)
+{
+    vector<string> errors;
+    auto_letters.clear();
+    for (string field : fields)
+    {
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        string error;
+        const size_t first = field.find(':');
+        if (field.npos == first)
+            error = "Missing :";
+        else if (field.npos != field.find(':', first+1))
+            error = "Too many :s";
+        else if (!first)
+            error = "No pattern before :";
+        else if (field.size() == 1+first)
+            error = "No slot list after :";
+        else
+        {
+            text_pattern pattern(field.substr(0, first-1), true);
+            string slots(field.substr(first+1));
+            for (auto c: slots)
+                if (!isaalpha(c) && c != '-' && c != '+')
+                    error += make_stringf(", \"%c\"", c);
+            if (!error.empty())
+                error = "Bad slot characters: "+error.substr(2);
+            else
+            {
+                pair<text_pattern,string> entry(pattern, slots);
+                if (remove)
+                    remove_matching(auto_letters, entry);
+                else
+                    auto_letters.push_back(entry);
+            }
+        }
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "("+name+") "+list;
+}
+
+string game_options::set_spell_slot(vector<string> &fields)
+{
+    return _set_slot(fields, "spell_slot", auto_spell_letters_w);
+}
+
+string game_options::set_item_slot(vector<string> &fields)
+{
+    return _set_slot(fields, "item_slot", auto_item_letters_w);
+}
+
+string game_options::set_ability_slot(vector<string> &fields)
+{
+    return _set_slot(fields, "ability_slot", auto_ability_letters_w);
+}
+
 #ifdef USE_TILE
 static FixedVector<const char*, TAGPREF_MAX>
     tag_prefs("none", "tutorial", "named", "enemy");
@@ -1484,9 +1552,6 @@ void game_options::reset_options()
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
                       | UA_ALWAYS_ON);
 
-    auto_spell_letters.clear();
-    auto_item_letters.clear();
-    auto_ability_letters.clear();
     force_more_message.clear();
     flash_screen_message.clear();
     sound_mappings.clear();
@@ -3662,33 +3727,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         }
     }
 
-    else if (key == "spell_slot"
-             || key == "item_slot"
-             || key == "ability_slot")
-
-    {
-        auto& auto_letters = (key == "item_slot"  ? auto_item_letters
-                           : (key == "spell_slot" ? auto_spell_letters
-                                                  : auto_ability_letters));
-        if (plain)
-            auto_letters.clear();
-
-        vector<string> thesplit = split_string(":", field);
-        if (thesplit.size() != 2)
-        {
-            return report_error("Error parsing %s string: %s\n",
-                                key.c_str(), field.c_str());
-        }
-        pair<text_pattern,string> entry(text_pattern(thesplit[0], true),
-                                        thesplit[1]);
-
-        if (minus_equal)
-            remove_matching(auto_letters, entry);
-        else if (caret_equal)
-            auto_letters.insert(auto_letters.begin(), entry);
-        else
-            auto_letters.push_back(entry);
-    }
     else if (key == "sort_menus")
     {
         for (const string &frag : split_string(";", field))
