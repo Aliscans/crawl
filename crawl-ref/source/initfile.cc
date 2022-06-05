@@ -436,6 +436,9 @@ const vector<GameOption*> game_options::build_options_list()
 #ifdef DGL_SIMPLE_MESSAGING
         new BoolGameOption(SIMPLE_NAME(messaging), false),
 #endif
+        new GameOptionHeading("Colours (messages and menus)"),
+        new CustomListGameOption(&game_options::set_menu_colour,
+                                 {"menu_colour"}, this),
         new GameOptionHeading("Interface: Quivers, firing, and ammo"),
         new CustomStringGameOption(&game_options::set_fire_items_start,
                                    {"fire_items_start"}, this, "a"),
@@ -1326,6 +1329,49 @@ string game_options::set_sound(vector<string> &fields)
     return "(sound) "+list;
 }
 
+string game_options::set_menu_colour(vector<string> &fields)
+{
+    vector<string> errors;
+    menu_colour_mappings_w.clear();
+    for (string field : fields)
+    {
+        string error;
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        vector<string> parts = split_string(":", field, false, true, 3);
+        if (parts.size() < 2)
+            error = "Missing :";
+        else
+        {
+            // XXX Should treat an invalid "match" as omitted, but there's no
+            // list of valid values.
+            if (2 == parts.size())
+                parts.insert(parts.begin(), "any");
+            colour_t mcolour = str_to_colour(parts[1], NUM_TERM_COLOURS);
+            colour_mapping mapping = {parts[0], parts[2], mcolour};
+            if (parts[0].empty())
+                error = "Empty match";
+            else if (parts[1].empty())
+                error = "Empty colour";
+            else if (parts[2].empty())
+                error = "Empty pattern";
+            else if (NUM_TERM_COLOURS == mcolour)
+                error = "Unknown colour";
+            else if (remove)
+                remove_matching(menu_colour_mappings_w, mapping);
+            else
+                menu_colour_mappings_w.push_back(mapping);
+        }
+        if (!error.empty())
+            errors.emplace_back(error + " in \"" + field + "\"");
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(menu_colour) "+list;
+}
+
 #ifdef USE_TILE
 static FixedVector<const char*, TAGPREF_MAX>
     tag_prefs("none", "tutorial", "named", "enemy");
@@ -1682,7 +1728,6 @@ void game_options::reset_options()
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
                       | UA_ALWAYS_ON);
 
-    menu_colour_mappings.clear();
     message_colour_mappings.clear();
     named_options.clear();
 
@@ -2755,6 +2800,7 @@ void game_options::reset_aliases(bool clear)
         aliases.clear();
     // Aus compatibility:
     Options.add_alias("center_on_scroll", "centre_on_scroll");
+    Options.add_alias("menu_color", "menu_colour");
     // Backwards compatibility:
     Options.add_alias("friend_brand", "friend_highlight");
     Options.add_alias("neutral_brand", "neutral_highlight");
@@ -3885,48 +3931,7 @@ void game_options::read_option_line(const string &str, bool runscript)
     // MSVC has a limit on how many if/else if can be chained together.
     else
 #endif
-    if (key == "menu_colour" || key == "menu_color")
-    {
-        if (plain)
-            menu_colour_mappings.clear();
-
-        vector<colour_mapping> new_entries;
-        for (const string &seg : split_string(",", field))
-        {
-            // Format is "tag:colour:pattern" or "colour:pattern" (default tag).
-            // FIXME: arrange so that you can use ':' inside a pattern
-            vector<string> subseg = split_string(":", seg, false);
-            string tagname, patname, colname;
-            if (subseg.size() < 2)
-                continue;
-            if (subseg.size() >= 3)
-            {
-                tagname = subseg[0];
-                colname = subseg[1];
-                patname = subseg[2];
-            }
-            else
-            {
-                colname = subseg[0];
-                patname = subseg[1];
-            }
-
-            colour_mapping mapping;
-            mapping.tag     = tagname;
-            mapping.pattern = patname;
-            const int col = str_to_colour(colname);
-            mapping.colour = col;
-
-            if (col == -1)
-                continue;
-            else if (minus_equal)
-                remove_matching(menu_colour_mappings, mapping);
-            else
-                new_entries.push_back(mapping);
-        }
-        merge_lists(menu_colour_mappings, new_entries, caret_equal);
-    }
-    else if (key == "message_colour" || key == "message_color")
+    if (key == "message_colour" || key == "message_color")
     {
         // TODO: support -= here.
         if (plain)

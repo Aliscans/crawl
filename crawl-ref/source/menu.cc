@@ -2934,8 +2934,8 @@ int menu_colour(const string &text, const string &prefix, const string &tag)
 
     for (const colour_mapping &cm : Options.menu_colour_mappings)
     {
-        if ((cm.tag.empty() || cm.tag == "any" || cm.tag == tag
-               || cm.tag == "inventory" && tag == "pickup")
+        if ((cm.tag == "any" || cm.tag == tag || cm.tag == "inventory"
+                                                 && tag == "pickup")
             && cm.pattern.matches(tmp_text))
         {
             return cm.colour;
