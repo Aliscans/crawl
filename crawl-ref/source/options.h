@@ -387,7 +387,6 @@ public:
     int         dump_kill_places;   // How to dump place information for kills.
     int         dump_message_count; // How many old messages to dump
 
-    int         dump_item_origins;  // Show where items came from?
     int         dump_item_origin_price;
 
     int         pickup_menu_limit;  // Over this number of items, menu for
@@ -633,6 +632,7 @@ private:
     unordered_set<string> dump_fields_w;
     // Order of sections in the character dump.
     vector<string> dump_order_w;
+    int dump_item_origins_w;                     // Show where items came from?
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -686,6 +686,7 @@ public:
     const unordered_set<string> &dump_fields = dump_fields_w;
     // Order of sections in the character dump.
     const vector<string> &dump_order = dump_order_w;
+    const int dump_item_origins = dump_item_origins_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -758,6 +759,7 @@ private:
     string set_menu_colour(vector<string> &fields);
     string set_message_colour(vector<string> &fields);
     string set_dump_order(vector<string> &fields);
+    string set_dump_item_origins(vector<string> &fields);
     void do_kill_map(const string &from, const string &to);
     int  read_explore_stop_conditions(const string &) const;
     use_animations_type read_use_animations(const string &) const;

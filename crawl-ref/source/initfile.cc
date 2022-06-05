@@ -619,6 +619,9 @@ const vector<GameOption*> game_options::build_options_list()
         new MultipleChoiceDefaultGameOption<int>(SIMPLE_NAME(dump_kill_places),
             KDO_ONE_PLACE, KDO_ONE_PLACE, {{"none", KDO_NO_PLACES},
             {"single", KDO_ONE_PLACE}, {"all", KDO_ALL_PLACES}}),
+        new CustomListGameOption(&game_options::set_dump_item_origins,
+                                 _rcfile_minus_to_plus, {"dump_item_origins"},
+                                 this, "artefacts"),
         new IntGameOption(SIMPLE_NAME(dump_item_origin_price), -1, -1),
         new IntGameOption(SIMPLE_NAME(dump_message_count), 40),
         new CustomListGameOption(&game_options::set_dump_order,
@@ -1403,6 +1406,55 @@ string game_options::set_dump_order(vector<string> &fields)
     return "";
 }
 
+// Return a map to convert names to item_origin_dump_selectors.
+static const map<string, int> &_name_to_dio()
+{
+    const map<int, vector<string>> _dio_to_names =
+    {
+        {IODS_ARTEFACTS, {"artefacts", "artifacts", "artefact", "artifact"}},
+        {IODS_EGO_ARMOUR, {"ego_weap", "ego weapon", "ego_weapon",
+                           "ego weapons", "ego_weapons"}},
+        {IODS_EGO_WEAPON, {"ego_weap", "ego weapon", "ego_weapon",
+                           "ego weapons", "ego_weapons"}},
+        {IODS_JEWELLERY, {"jewellery", "jewelry"}},
+        {IODS_RUNES, {"runes"}},
+        {IODS_STAVES, {"staves"}},
+        {IODS_BOOKS, {"books"}},
+        {IODS_EVERYTHING, {"all"}},
+    };
+    static map<string, int> out;
+    if (out.empty())
+    {
+        for (auto x : _dio_to_names)
+            for (auto n : x.second)
+                out[n] = x.first;
+    }
+    return out;
+}
+string game_options::set_dump_item_origins(vector<string> &fields)
+{
+    vector<string> errors;
+    int new_dump_item_origins = 0; // IOD_PRICE;
+    for (string field : fields)
+    {
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        auto dio =  _name_to_dio().find(field);
+        if ( _name_to_dio().end() != dio)
+            new_dump_item_origins |= dio->second;
+        else
+            errors.emplace_back("Unknown field \"" + field + "\"");
+    }
+    if (errors.empty())
+    {
+        dump_item_origins_w = new_dump_item_origins;
+        return "";
+    }
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(dump_item_origins) "+list;
+}
+
 string game_options::set_message_colour(vector<string> &fields)
 {
     vector<string> errors;
@@ -1688,8 +1740,6 @@ void game_options::reset_options()
                               | ES_SHOP | ES_ALTAR | ES_RUNED_DOOR
                               | ES_TRANSPORTER | ES_GREEDY_PICKUP_SMART
                               | ES_GREEDY_VISITED_ITEM_STACK);
-
-    dump_item_origins      = IODS_ARTEFACTS;
 
     flush_input[ FLUSH_ON_FAILURE ]     = true;
     flush_input[ FLUSH_BEFORE_COMMAND ] = false;
@@ -3973,42 +4023,6 @@ void game_options::read_option_line(const string &str, bool runscript)
                 string to   = s.substr(cpos + 1);
                 do_kill_map(from, to);
             }
-        }
-    }
-    else if (key == "dump_item_origins")
-    {
-        if (plain)
-            dump_item_origins = IODS_PRICE;
-
-        for (const string &ch : split_string(",", field))
-        {
-            if (ch == "artefacts" || ch == "artifacts"
-                || ch == "artefact" || ch == "artifact")
-            {
-                dump_item_origins |= IODS_ARTEFACTS;
-            }
-            else if (ch == "ego_arm" || ch == "ego armour"
-                     || ch == "ego_armour" || ch == "ego armor"
-                     || ch == "ego_armor")
-            {
-                dump_item_origins |= IODS_EGO_ARMOUR;
-            }
-            else if (ch == "ego_weap" || ch == "ego weapon"
-                     || ch == "ego_weapon" || ch == "ego weapons"
-                     || ch == "ego_weapons")
-            {
-                dump_item_origins |= IODS_EGO_WEAPON;
-            }
-            else if (ch == "jewellery" || ch == "jewelry")
-                dump_item_origins |= IODS_JEWELLERY;
-            else if (ch == "runes")
-                dump_item_origins |= IODS_RUNES;
-            else if (ch == "staves")
-                dump_item_origins |= IODS_STAVES;
-            else if (ch == "books")
-                dump_item_origins |= IODS_BOOKS;
-            else if (ch == "all" || ch == "everything")
-                dump_item_origins = IODS_EVERYTHING;
         }
     }
     else if (key == "additional_macro_file")
