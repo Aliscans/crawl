@@ -390,10 +390,6 @@ public:
     int         dump_item_origins;  // Show where items came from?
     int         dump_item_origin_price;
 
-    unordered_set<string> dump_fields;
-    // Order of sections in the character dump.
-    vector<string> dump_order;
-
     int         pickup_menu_limit;  // Over this number of items, menu for
                                     // pickup
     bool        ability_menu;       // 'a'bility starts with a full-screen menu
@@ -634,6 +630,9 @@ private:
     vector<sound_mapping> sound_mappings_w;
     vector<colour_mapping> menu_colour_mappings_w;
     vector<message_colour_mapping> message_colour_mappings_w;
+    unordered_set<string> dump_fields_w;
+    // Order of sections in the character dump.
+    vector<string> dump_order_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -684,6 +683,9 @@ public:
     const vector<colour_mapping> &menu_colour_mappings = menu_colour_mappings_w;
     vector<message_colour_mapping>
         &message_colour_mappings = message_colour_mappings_w;
+    const unordered_set<string> &dump_fields = dump_fields_w;
+    // Order of sections in the character dump.
+    const vector<string> &dump_order = dump_order_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -755,8 +757,7 @@ private:
     string set_sound(vector<string> &fields);
     string set_menu_colour(vector<string> &fields);
     string set_message_colour(vector<string> &fields);
-    void new_dump_fields(const string &text, bool add = true,
-                         bool prepend = false);
+    string set_dump_order(vector<string> &fields);
     void do_kill_map(const string &from, const string &to);
     int  read_explore_stop_conditions(const string &) const;
     use_animations_type read_use_animations(const string &) const;

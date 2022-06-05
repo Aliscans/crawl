@@ -621,6 +621,12 @@ const vector<GameOption*> game_options::build_options_list()
             {"single", KDO_ONE_PLACE}, {"all", KDO_ALL_PLACES}}),
         new IntGameOption(SIMPLE_NAME(dump_item_origin_price), -1, -1),
         new IntGameOption(SIMPLE_NAME(dump_message_count), 40),
+        new CustomListGameOption(&game_options::set_dump_order,
+                                 {"dump_order"}, this,
+                                 "header,hiscore,stats,misc,inventory,"
+                                 "skills,spells,overview,mutations,messages,"
+                                 "screenshot,monlist,kills,notes,screenshots,"
+                                 "vaults,skill_gains,action_counts"),
         new GameOptionHeading("Character Dump: Notes"),
         new StringGameOption(SIMPLE_NAME(user_note_prefix), ""),
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_items)),
@@ -1371,7 +1377,30 @@ string game_options::set_menu_colour(vector<string> &fields)
     if (errors.empty())
         return "";
     string list = comma_separated_line(errors.begin(), errors.end());
-    return "(menu_colour) "+list;
+    return "(message_colour) "+list;
+}
+
+string game_options::set_dump_order(vector<string> &fields)
+{
+    vector<string> errors;
+    menu_colour_mappings_w.clear();
+    for (string field : fields)
+    {
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        if (remove)
+        {
+            dump_fields_w.erase(field);
+            erase_val(dump_order_w, field);
+        }
+        else if (!dump_fields.count(field))
+        {
+            dump_fields_w.insert(field);
+            dump_order_w.emplace_back(field);
+        }
+    }
+    return "";
 }
 
 string game_options::set_message_colour(vector<string> &fields)
@@ -1410,26 +1439,6 @@ static tag_pref _str_to_tag_pref(const char *opt)
     return TAGPREF_ENEMY;
 }
 #endif
-
-void game_options::new_dump_fields(const string &text, bool add, bool prepend)
-{
-    // Easy; chardump.cc has most of the intelligence.
-    vector<string> fields = split_string(",", text, true, true);
-    if (add)
-    {
-        erase_if(fields, [this](const string &x) { return dump_fields.count(x) > 0; });
-        dump_fields.insert(fields.begin(), fields.end());
-        merge_lists(dump_order, fields, prepend);
-    }
-    else
-    {
-        for (const string &field : fields)
-        {
-            dump_fields.erase(field);
-            erase_val(dump_order, field);
-        }
-    }
-}
 
 static string _correct_spelling(const string& str)
 {
@@ -1737,15 +1746,9 @@ void game_options::reset_options()
         channels[i] = MSGCOL_DEFAULT;
 
     // Clear vector options.
-    dump_order.clear();
-    dump_fields.clear();
-    new_dump_fields("header,hiscore,stats,misc,inventory,"
-                    "skills,spells,overview,mutations,messages,"
-                    "screenshot,monlist,kills,notes,screenshots,vaults,"
-                    "skill_gains,action_counts");
     // Currently enabled by default for testing in trunk.
     if (Version::ReleaseType == VER_ALPHA)
-        new_dump_fields("turns_by_place");
+        read_option_line("dump_order += turns_by_place", false);
 
     use_animations = (UA_BEAM | UA_RANGE | UA_HP | UA_MONSTER_IN_SIGHT
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
@@ -3951,17 +3954,7 @@ void game_options::read_option_line(const string &str, bool runscript)
     // MSVC has a limit on how many if/else if can be chained together.
     else
 #endif
-    if (key == "dump_order")
-    {
-        if (plain)
-        {
-            dump_fields.clear();
-            dump_order.clear();
-        }
-
-        new_dump_fields(field, !minus_equal, caret_equal);
-    }
-    else if (key == "kill_map")
+    if (key == "kill_map")
     {
         // TODO: treat this as a map option (e.g. kill_map.you = friendly)
         if (plain && field.empty())
