@@ -380,7 +380,6 @@ public:
     bool        travel_one_unsafe_move; // Allow one unsafe move of auto travel
 
     string sound_file_path;
-    vector<message_colour_mapping> message_colour_mappings;
 
     vector<menu_sort_condition> sort_menus;
 
@@ -634,6 +633,7 @@ private:
     FixedVector<int8_t,NUM_FEATURES> forbidden_terrain_w;
     vector<sound_mapping> sound_mappings_w;
     vector<colour_mapping> menu_colour_mappings_w;
+    vector<message_colour_mapping> message_colour_mappings_w;
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -682,6 +682,8 @@ public:
         &forbidden_terrain = forbidden_terrain_w;
     const vector<sound_mapping> &sound_mappings = sound_mappings_w;
     const vector<colour_mapping> &menu_colour_mappings = menu_colour_mappings_w;
+    vector<message_colour_mapping>
+        &message_colour_mappings = message_colour_mappings_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -718,9 +720,7 @@ private:
     string add_feature_override(const string &);
     string remove_feature_override(const string &);
 
-    void add_message_colour_mappings(const string &, bool, bool);
-    void add_message_colour_mapping(const string &, bool, bool);
-    message_filter parse_message_filter(const string &s);
+    string add_message_colour_mapping(string &field, bool remove);
 
     void set_default_activity_interrupts();
     void set_activity_interrupt(FixedBitVector<NUM_ACTIVITY_INTERRUPTS> &eints,
@@ -754,6 +754,7 @@ private:
     string set_travel_avoid_terrain(vector<string> &fields);
     string set_sound(vector<string> &fields);
     string set_menu_colour(vector<string> &fields);
+    string set_message_colour(vector<string> &fields);
     void new_dump_fields(const string &text, bool add = true,
                          bool prepend = false);
     void do_kill_map(const string &from, const string &to);

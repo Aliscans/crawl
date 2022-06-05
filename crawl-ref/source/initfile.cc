@@ -439,6 +439,8 @@ const vector<GameOption*> game_options::build_options_list()
         new GameOptionHeading("Colours (messages and menus)"),
         new CustomListGameOption(&game_options::set_menu_colour,
                                  {"menu_colour"}, this),
+        new CustomListGameOption(&game_options::set_message_colour,
+                                 {"message_colour"}, this),
         new GameOptionHeading("Interface: Quivers, firing, and ammo"),
         new CustomStringGameOption(&game_options::set_fire_items_start,
                                    {"fire_items_start"}, this, "a"),
@@ -1372,6 +1374,27 @@ string game_options::set_menu_colour(vector<string> &fields)
     return "(menu_colour) "+list;
 }
 
+string game_options::set_message_colour(vector<string> &fields)
+{
+    vector<string> errors;
+    menu_colour_mappings_w.clear();
+    for (string &field : fields)
+    {
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        string error = add_message_colour_mapping(field, remove);
+        if (!error.empty())
+            errors.emplace_back(error + " in \"" + field + "\"");
+        else
+            field = string(remove, ' ')+field;
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(message_colour) "+list;
+}
+
 #ifdef USE_TILE
 static FixedVector<const char*, TAGPREF_MAX>
     tag_prefs("none", "tutorial", "named", "enemy");
@@ -1728,7 +1751,6 @@ void game_options::reset_options()
                       | UA_PICKUP | UA_MONSTER | UA_PLAYER | UA_BRANCH_ENTRY
                       | UA_ALWAYS_ON);
 
-    message_colour_mappings.clear();
     named_options.clear();
 
     // Map each category to itself. The user can override in init.txt
@@ -3284,17 +3306,8 @@ string game_options::expand_vars(const string &field) const
     return field_out;
 }
 
-void game_options::add_message_colour_mappings(const string &field,
-                                               bool prepend, bool subtract)
-{
-    vector<string> fragments = split_string(",", field);
-    if (prepend)
-        reverse(fragments.begin(), fragments.end());
-    for (const string &fragment : fragments)
-        add_message_colour_mapping(fragment, prepend, subtract);
-}
-
-message_filter game_options::parse_message_filter(const string &filter)
+static message_filter _parse_message_filter(const string &filter,
+                                            bool &has_channel)
 {
     string::size_type pos = filter.find(":");
     if (pos && pos != string::npos)
@@ -3305,37 +3318,44 @@ message_filter game_options::parse_message_filter(const string &filter)
         {
             string s = filter.substr(pos + 1);
             trim_string(s);
+            has_channel = true;
             return message_filter(channel, s);
         }
     }
 
+    has_channel = false;
     return message_filter(filter);
 }
 
-void game_options::add_message_colour_mapping(const string &field,
-                                              bool prepend, bool subtract)
+string game_options::add_message_colour_mapping(string &field, bool remove)
 {
     vector<string> cmap = split_string(":", field, true, true, 1);
 
     if (cmap.size() != 2)
-        return;
+        return "Missing :";
+    else if (!cmap[0].size())
+        return "Empty colour";
+    else if (!cmap[1].size())
+        return "Empty pattern";
 
     const int col = str_to_colour(cmap[0]);
     msg_colour_type mcol;
     if (cmap[0] == "mute")
         mcol = MSGCOL_MUTED;
     else if (col == -1)
-        return;
+        return "Unknown colour";
     else
         mcol = msg_colour(col);
 
-    message_colour_mapping m = { parse_message_filter(cmap[1]), mcol };
-    if (subtract)
-        remove_matching(message_colour_mappings, m);
-    else if (prepend)
-        message_colour_mappings.insert(message_colour_mappings.begin(), m);
+    bool channel;
+    message_colour_mapping m = {_parse_message_filter(cmap[1], channel), mcol};
+    if (!channel)
+        field.insert(cmap[0].size(), ":any");
+    if (remove)
+        remove_matching(message_colour_mappings_w, m);
     else
-        message_colour_mappings.push_back(m);
+        message_colour_mappings_w.push_back(m);
+    return "";
 }
 
 // Option syntax is:
@@ -3931,15 +3951,7 @@ void game_options::read_option_line(const string &str, bool runscript)
     // MSVC has a limit on how many if/else if can be chained together.
     else
 #endif
-    if (key == "message_colour" || key == "message_color")
-    {
-        // TODO: support -= here.
-        if (plain)
-            message_colour_mappings.clear();
-
-        add_message_colour_mappings(field, caret_equal, minus_equal);
-    }
-    else if (key == "dump_order")
+    if (key == "dump_order")
     {
         if (plain)
         {
