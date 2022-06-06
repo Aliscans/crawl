@@ -8,8 +8,8 @@
 #include "format.h"
 
 // if you mess with this list, you'll need to make changes in initfile.cc
-// to message_channel_names, and probably also to message.cc to colour
-// everything properly
+// to message_channel_names and message_channel_order, and probably also to
+// message.cc to colour everything properly
 enum msg_channel_type
 {
     MSGCH_PLAIN,            // regular text

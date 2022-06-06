@@ -184,6 +184,29 @@ const vector<ability_type> _fat_list =
 static string _force_ability_targeter_default = comma_separated_fn(
     _fat_list.begin(), _fat_list.end(), ability_name, ",", ",");
 
+static const string message_channel_names[] =
+{
+    "plain", "friend_action", "prompt", "god", "duration", "danger", "warning",
+    "recovery", "sound", "talk", "talk_visual", "intrinsic_gain",
+    "mutation", "monster_spell", "monster_enchant", "friend_spell",
+    "friend_enchant", "monster_damage", "monster_target", "banishment",
+    "equipment", "floor", "multiturn", "examine", "examine_filter", "diagnostic",
+    "error", "tutorial", "orb", "timed_portal", "hell_effect", "monster_warning",
+    "dgl_message",
+};
+
+// List the msg_channel_types in the order used in the manual.
+static const msg_channel_type message_channel_order[]  =
+{ MSGCH_PLAIN, MSGCH_PROMPT, MSGCH_GOD, MSGCH_DURATION, MSGCH_DANGER,
+  MSGCH_WARN, MSGCH_RECOVERY, MSGCH_TALK, MSGCH_TALK_VISUAL, MSGCH_TIMED_PORTAL,
+  MSGCH_SOUND, MSGCH_INTRINSIC_GAIN, MSGCH_MUTATION, MSGCH_MONSTER_SPELL,
+  MSGCH_MONSTER_ENCHANT, MSGCH_MONSTER_WARNING, MSGCH_FRIEND_SPELL,
+  MSGCH_FRIEND_ENCHANT, MSGCH_FRIEND_ACTION, MSGCH_MONSTER_DAMAGE,
+  MSGCH_MONSTER_TARGET, MSGCH_BANISHMENT, MSGCH_EQUIPMENT, MSGCH_FLOOR_ITEMS,
+  MSGCH_MULTITURN_ACTION, MSGCH_EXAMINE, MSGCH_EXAMINE_FILTER,
+  MSGCH_DIAGNOSTICS, MSGCH_ERROR, MSGCH_TUTORIAL, MSGCH_ORB, MSGCH_HELL_EFFECT,
+  MSGCH_DGL_MESSAGE, };
+
 const vector<GameOption*> game_options::build_options_list()
 {
 #ifndef DEBUG
@@ -217,7 +240,7 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
 
     #define SIMPLE_NAME(_opt) _opt, {#_opt}
-    MenuGameOption *opt_colour;
+    MenuGameOption *opt_colour = nullptr, *opt_channel = nullptr;
     vector<GameOption*> options = {
         new GameOptionHeading("Starting Screen"),
 #if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
@@ -442,6 +465,8 @@ const vector<GameOption*> game_options::build_options_list()
                                  {"menu_colour"}, this),
         new CustomListGameOption(&game_options::set_message_colour,
                                  {"message_colour"}, this),
+        new GameOptionHeading("Interface: Message Channels"),
+        opt_channel = new MenuGameOption({"channel"}),
         new GameOptionHeading("Interface: Quivers, firing, and ammo"),
         new CustomStringGameOption(&game_options::set_fire_items_start,
                                    {"fire_items_start"}, this, "a"),
@@ -699,9 +724,11 @@ const vector<GameOption*> game_options::build_options_list()
         new ListGameOption<string>(SIMPLE_NAME(fsim_scale)),
         new ListGameOption<string>(SIMPLE_NAME(fsim_kit)),
 #endif
+#undef SIMPLE_NAME
     };
     // Add some options with names derived from other data.
     vector<pair<string, int>> colour_choice(NUM_TERM_COLOURS);
+    ASSERT(opt_colour);
     for (int c = 0; c < NUM_TERM_COLOURS; c++)
         colour_choice[c] = {colour_to_str(c), c};
     for (int c = 0; c < NUM_TERM_COLOURS; c++)
@@ -713,7 +740,26 @@ const vector<GameOption*> game_options::build_options_list()
         options.push_back(opt);
     }
 
-#undef SIMPLE_NAME
+    COMPILE_CHECK(ARRAYSZ(message_channel_names) == NUM_MESSAGE_CHANNELS);
+    ASSERT(opt_channel);
+    vector<pair<string, msg_colour_type>> channel_choice =
+    {
+        {"mute", MSGCOL_MUTED}, {"plain", MSGCOL_PLAIN}, {"off", MSGCOL_PLAIN},
+        {"default", MSGCOL_DEFAULT}, {"on", MSGCOL_DEFAULT},
+        {"alternative", MSGCOL_ALTERNATE}
+    };
+    channel_choice.resize(NUM_TERM_COLOURS+6);
+    for (int c = 0; c < NUM_TERM_COLOURS; c++)
+        channel_choice[c+6] = {colour_choice[c].first, (msg_colour_type)c};
+
+    for (auto c : message_channel_order)
+    {
+        string name = "channel."+message_channel_names[c];
+        auto opt = new MultipleChoiceGameOption<msg_colour_type>(
+            channels[c], {name}, MSGCOL_DEFAULT, channel_choice);
+        opt->parent = opt_channel;
+        options.push_back(opt);
+    }
     return options;
 }
 
@@ -776,39 +822,6 @@ object_class_type item_class_by_sym(char32_t c)
         return NUM_OBJECT_CLASSES;
     }
 }
-
-// Returns MSGCOL_NONE if unmatched else returns 0-15.
-static msg_colour_type _str_to_channel_colour(const string &str)
-{
-    int col = str_to_colour(str);
-    msg_colour_type ret = MSGCOL_NONE;
-    if (col == -1)
-    {
-        if (str == "mute")
-            ret = MSGCOL_MUTED;
-        else if (str == "plain" || str == "off")
-            ret = MSGCOL_PLAIN;
-        else if (str == "default" || str == "on")
-            ret = MSGCOL_DEFAULT;
-        else if (str == "alternate")
-            ret = MSGCOL_ALTERNATE;
-    }
-    else
-        ret = msg_colour(col);
-
-    return ret;
-}
-
-static const string message_channel_names[] =
-{
-    "plain", "friend_action", "prompt", "god", "duration", "danger", "warning",
-    "recovery", "sound", "talk", "talk_visual", "intrinsic_gain",
-    "mutation", "monster_spell", "monster_enchant", "friend_spell",
-    "friend_enchant", "monster_damage", "monster_target", "banishment",
-    "equipment", "floor", "multiturn", "examine", "examine_filter", "diagnostic",
-    "error", "tutorial", "orb", "timed_portal", "hell_effect", "monster_warning",
-    "dgl_message",
-};
 
 // returns 0--(NUM_MESSAGE_CHANNELS-1) if matched else returns def_value (or -1)
 int str_to_channel(const string &str, int def_value)
@@ -1800,10 +1813,6 @@ void game_options::reset_options()
     action_panel.emplace_back(OBJ_POTIONS);
     action_panel.emplace_back(OBJ_MISCELLANY);
 #endif
-
-    // map each channel to plain (well, default for now since I'm testing)
-    for (int i = 0; i < NUM_MESSAGE_CHANNELS; ++i)
-        channels[i] = MSGCOL_DEFAULT;
 
     // Clear vector options.
     // Currently enabled by default for testing in trunk.
@@ -2884,6 +2893,7 @@ void game_options::reset_aliases(bool clear)
     if (clear)
         aliases.clear();
     // Aus compatibility:
+    Options.add_alias("alternate", "alternative");
     Options.add_alias("center_on_scroll", "centre_on_scroll");
     Options.add_alias("menu_color", "menu_colour");
     Options.add_alias("color", "colour");
@@ -3792,18 +3802,6 @@ void game_options::read_option_line(const string &str, bool runscript)
     }
     else if (key == "terp_file" && runscript)
         terp_files.push_back(field);
-    else if (key == "channel")
-    {
-        const int chnl = str_to_channel(subkey);
-        const msg_colour_type col  = _str_to_channel_colour(field);
-
-        if (chnl != -1 && col != MSGCOL_NONE)
-            channels[chnl] = col;
-        else if (chnl == -1)
-            report_error("Bad channel -- %s", subkey.c_str());
-        else if (col == MSGCOL_NONE)
-            report_error("Bad colour -- %s", field.c_str());
-    }
     else if (key == "use_animations")
     {
         if (plain)

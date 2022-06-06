@@ -1920,14 +1920,14 @@ CHANNEL_NAME can currently be one of these:
    dgl_message     = messages from watchers (online console games only)
 
 The channel options are
-   mute      = show no messages from channel (dangerous, be careful!)
-   default   = turn channel on to its default scheme
-   alternate = turn channel on to its alternate "colourful" scheme
-   on        = same as default
-   plain     = make channel the same colour as the "plain" channel
-               (won't do anything silly like "mute" if plain == mute,
-               though)
-   off       = same as plain
+   mute        = show no messages from channel (dangerous, be careful!)
+   default     = turn channel on to its default scheme
+   alternative = turn channel on to its alternative "colourful" scheme
+   on          = same as default
+   plain       = make channel the same colour as the "plain" channel
+                 (won't do anything silly like "mute" if plain == mute,
+                 though)
+   off         = same as plain
 
 COLOUR can be any of the colours described in section 5-a (colour option).
 
