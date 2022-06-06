@@ -73,7 +73,8 @@ public:
 extern system_environment SysEnv;
 
 bool parse_args(int argc, char **argv, bool rc_only);
-void edit_game_prefs();
+class MenuGameOption;
+bool edit_game_prefs(MenuGameOption *parent = nullptr);
 
 struct newgame_def;
 void write_newgame_options_file(const newgame_def& prefs);

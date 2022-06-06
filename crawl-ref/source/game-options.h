@@ -56,11 +56,12 @@ private:
     int highlight_until;
 };
 
+class MenuGameOption;
 class GameOption
 {
 public:
-    GameOption(vector<string> _names)
-        : names(_names), loaded(false) { }
+    GameOption(vector<string> _names, MenuGameOption *_parent=nullptr)
+        : parent(_parent), names(_names), loaded(false) { }
     virtual ~GameOption() {};
 
     // XX reset and some other stuff could be templated for most
@@ -72,12 +73,7 @@ public:
         loadFromString(other->str(), RCFILE_LINE_EQUALS);
         loaded = real_loaded;
     }
-    virtual string loadFromString(const std::string &, rc_line_type)
-    {
-        loaded = true;
-        return "";
-    }
-
+    virtual string loadFromString(const std::string &, rc_line_type ltyp);
     virtual bool load_from_UI() = 0;
     virtual const string str() const = 0;
 
@@ -92,6 +88,7 @@ public:
         on_change = _on_change;
         return this;
     }
+    MenuGameOption *parent;
 
 protected:
     vector<string> names;
@@ -115,6 +112,16 @@ private:
 
 bool load_string_from_UI(GameOption *option);
 bool choose_option_from_UI(GameOption *caller, vector<string> choices);
+
+class MenuGameOption : public GameOption
+{
+public:
+    MenuGameOption(vector<string> _names, MenuGameOption *_parent = nullptr) :
+        GameOption(_names, _parent) { }
+    const string str() const override {    return "--->"; }
+    string loadFromString(const string &field, rc_line_type ltyp) override;
+    bool load_from_UI() override;
+};
 
 class BoolGameOption : public GameOption
 {

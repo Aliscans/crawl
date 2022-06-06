@@ -6,6 +6,7 @@
 #include "AppHdr.h"
 
 #include "game-options.h"
+#include "initfile.h"
 #include "lookup-help.h"
 #include "options.h"
 #include "menu.h"
@@ -169,6 +170,14 @@ bool load_string_from_UI(GameOption *caller)
         show_type_response(error);
         old = select;
     }
+}
+
+string GameOption::loadFromString(const string &, rc_line_type ltyp)
+{
+    loaded = true;
+    if (parent)
+        return parent->loadFromString("", ltyp);
+    return "";
 }
 
 string BoolGameOption::loadFromString(const string &field, rc_line_type ltyp)
@@ -563,4 +572,16 @@ void CustomListGameOption::set_minus()
     auto r = RCFILE_LINE_MINUS;
     convert_ltyp(r);
     use_minus = RCFILE_LINE_MINUS == r;
+}
+
+string MenuGameOption::loadFromString(const string &field, rc_line_type ltyp)
+{
+    if (field.size())
+        return "Unrecognised/missing subkey for \""+name()+"\".";
+    return GameOption::loadFromString(field, ltyp);
+}
+
+bool MenuGameOption::load_from_UI()
+{
+    return edit_game_prefs(this);
 }

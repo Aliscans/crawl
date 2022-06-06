@@ -217,6 +217,7 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
 
     #define SIMPLE_NAME(_opt) _opt, {#_opt}
+    MenuGameOption *opt_colour;
     vector<GameOption*> options = {
         new GameOptionHeading("Starting Screen"),
 #if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
@@ -659,6 +660,7 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
         new MultipleChoiceGameOption<char_set_type>(SIMPLE_NAME(char_set),
             CSET_DEFAULT, {{"ascii", CSET_ASCII}, {"default", CSET_DEFAULT}}),
+        opt_colour = new MenuGameOption({"colour"}),
         new CustomListGameOption(&game_options::set_display_char,
                                  _rcfile_plus_only, {"display_char"}, this),
         new CustomListGameOption(&game_options::set_feature, _rcfile_no_caret,
@@ -698,6 +700,18 @@ const vector<GameOption*> game_options::build_options_list()
         new ListGameOption<string>(SIMPLE_NAME(fsim_kit)),
 #endif
     };
+    // Add some options with names derived from other data.
+    vector<pair<string, int>> colour_choice(NUM_TERM_COLOURS);
+    for (int c = 0; c < NUM_TERM_COLOURS; c++)
+        colour_choice[c] = {colour_to_str(c), c};
+    for (int c = 0; c < NUM_TERM_COLOURS; c++)
+    {
+        const string colstr = colour_to_str(c);
+        auto opt = new MultipleChoiceGameOption<int> (colour[c],
+            {"colour."+colstr}, c, colour_choice);
+        opt->parent = opt_colour;
+        options.push_back(opt);
+    }
 
 #undef SIMPLE_NAME
     return options;
@@ -1787,10 +1801,6 @@ void game_options::reset_options()
     action_panel.emplace_back(OBJ_MISCELLANY);
 #endif
 
-    // map each colour to itself as default
-    for (int i = 0; i < (int)ARRAYSZ(colour); ++i)
-        colour[i] = i;
-
     // map each channel to plain (well, default for now since I'm testing)
     for (int i = 0; i < NUM_MESSAGE_CHANNELS; ++i)
         channels[i] = MSGCOL_DEFAULT;
@@ -2876,6 +2886,7 @@ void game_options::reset_aliases(bool clear)
     // Aus compatibility:
     Options.add_alias("center_on_scroll", "centre_on_scroll");
     Options.add_alias("menu_color", "menu_colour");
+    Options.add_alias("color", "colour");
     // Backwards compatibility:
     Options.add_alias("friend_brand", "friend_highlight");
     Options.add_alias("neutral_brand", "neutral_highlight");
@@ -3711,7 +3722,13 @@ void game_options::read_option_line(const string &str, bool runscript)
         lowercase(field);
     }
 
-    GameOption *const *option = map_find(options_by_name, key);
+    GameOption *const *option = nullptr;
+    if (subkey.size())
+        option = map_find(options_by_name, key+"."+subkey);
+    if (subkey.size() && !option)
+        option = map_find(options_by_name, unalias(key)+"."+unalias(subkey));
+    if (!option)
+        option = map_find(options_by_name, key);
     if (option)
     {
         const string error = (*option)->loadFromString(field, line_type);
@@ -3775,19 +3792,6 @@ void game_options::read_option_line(const string &str, bool runscript)
     }
     else if (key == "terp_file" && runscript)
         terp_files.push_back(field);
-    else if (key == "colour" || key == "color")
-    {
-        const int orig_col   = str_to_colour(subkey);
-        const int result_col = str_to_colour(field);
-
-        if (orig_col != -1 && result_col != -1)
-            colour[orig_col] = result_col;
-        else
-        {
-            report_error("Bad colour -- %s=%d or %s=%d\n",
-                     subkey.c_str(), orig_col, field.c_str(), result_col);
-        }
-    }
     else if (key == "channel")
     {
         const int chnl = str_to_channel(subkey);
@@ -5906,8 +5910,13 @@ bool parse_args(int argc, char **argv, bool rc_only)
 class EGP_Menu : public Menu
 {
 public:
-    EGP_Menu(int _flags) : Menu(_flags)
-                           { set_title(new MenuEntry(base_title, MEL_TITLE));}
+    EGP_Menu(GameOption *parent, int _flags)
+        : Menu(_flags)
+        {
+            if (parent)
+                base_title = "["+parent->name() + "] " + base_title;
+            set_title(new MenuEntry(base_title, MEL_TITLE));
+        }
 
     ~EGP_Menu()
     {
@@ -6025,13 +6034,15 @@ static string _option_line(const GameOption *option, int name_len, int text_len)
 }
 
 // Show (and perhaps edit) options for the game.
-void edit_game_prefs()
+// Return true if an option is changed by this.
+bool edit_game_prefs(MenuGameOption *parent)
 {
+    bool change = false;
     auto list = Options.get_option_behaviour();
     string selected;
 
     // The caller should remove any user-provided formatting.
-    EGP_Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
+    EGP_Menu menu(parent, MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
                   | MF_ALLOW_FORMATTING | MF_INIT_HOVER);
     menu.set_tag("option");
 
@@ -6039,6 +6050,8 @@ void edit_game_prefs()
     string last_header;
     for (const auto option : list)
     {
+        if (option->parent != parent)
+            continue;
         if (option->name().empty())
         {
             last_header = option->str();
@@ -6053,13 +6066,14 @@ void edit_game_prefs()
         const char letter = index_to_letter(i++ % 52);
         auto entry = new EGP_MenuEntry(line, MEL_ITEM, 1, letter, 36);
         entry->data = option;
-        entry->on_select = [entry](const MenuEntry&)
+        entry->on_select = [&change, entry](const MenuEntry&)
         {
             GameOption *opt = static_cast<GameOption*>(entry->data);
             if (opt->load_from_UI())
             {
                 entry->text = _option_line(opt, 36, 79-36-4);
                 opt->on_change(&Options);
+                change = true;
             }
             return true;
         };
@@ -6068,6 +6082,7 @@ void edit_game_prefs()
 
     menu.set_hovered(0);
     menu.show();
+    return change;
 }
 
 ///////////////////////////////////////////////////////////////////////
