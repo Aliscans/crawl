@@ -497,6 +497,14 @@ const vector<GameOption*> game_options::build_options_list()
             SIMPLE_NAME(show_god_gift), MB_MAYBE, MB_FALSE, MB_TRUE,
             {{"unidentified", MB_MAYBE}, {"unident", MB_MAYBE},
              {"unid", MB_MAYBE}}),
+        new GameOptionHeading("Interface: Macro related Options"),
+        new BoolGameOption(flush_input[FLUSH_ON_FAILURE], {"flush.failure"},
+                           true),
+        new BoolGameOption(flush_input[FLUSH_BEFORE_COMMAND], {"flush.command"},
+                           false),
+        new BoolGameOption(flush_input[FLUSH_ON_MESSAGE], {"flush.message"},
+                           false),
+        new BoolGameOption(flush_input[FLUSH_LUA], {"flush.lua"}, true),
         new GameOptionHeading("Interface: Tiles Options"),
 #ifdef USE_TILE
         new StringGameOption(SIMPLE_NAME(tile_show_items), "!?/=([)}:|"),
@@ -1767,11 +1775,6 @@ void game_options::reset_options()
                               | ES_SHOP | ES_ALTAR | ES_RUNED_DOOR
                               | ES_TRANSPORTER | ES_GREEDY_PICKUP_SMART
                               | ES_GREEDY_VISITED_ITEM_STACK);
-
-    flush_input[ FLUSH_ON_FAILURE ]     = true;
-    flush_input[ FLUSH_BEFORE_COMMAND ] = false;
-    flush_input[ FLUSH_ON_MESSAGE ]     = false;
-    flush_input[ FLUSH_LUA ]            = true;
 
     // These are only used internally, and only from the commandline:
     // XXX: These need a better place.
@@ -3735,9 +3738,9 @@ void game_options::read_option_line(const string &str, bool runscript)
     GameOption *const *option = nullptr;
     if (subkey.size())
         option = map_find(options_by_name, key+"."+subkey);
-    if (subkey.size() && !option)
+    if (!option && subkey.size())
         option = map_find(options_by_name, unalias(key)+"."+unalias(subkey));
-    if (!option)
+    if (subkey.empty())
         option = map_find(options_by_name, key);
     if (option)
     {
@@ -3899,29 +3902,6 @@ void game_options::read_option_line(const string &str, bool runscript)
     {
         read_option_line("scroll_margin_x = "+field, runscript);
         read_option_line("scroll_margin_y = "+field, runscript);
-    }
-    else if (key == "flush")
-    {
-        if (subkey == "failure")
-        {
-            flush_input[FLUSH_ON_FAILURE]
-                = read_bool(field, flush_input[FLUSH_ON_FAILURE]);
-        }
-        else if (subkey == "command")
-        {
-            flush_input[FLUSH_BEFORE_COMMAND]
-                = read_bool(field, flush_input[FLUSH_BEFORE_COMMAND]);
-        }
-        else if (subkey == "message")
-        {
-            flush_input[FLUSH_ON_MESSAGE]
-                = read_bool(field, flush_input[FLUSH_ON_MESSAGE]);
-        }
-        else if (subkey == "lua")
-        {
-            flush_input[FLUSH_LUA]
-                = read_bool(field, flush_input[FLUSH_LUA]);
-        }
     }
 #if !defined(WIZARD) || defined(DGAMELAUNCH)
     else if (key == "wiz_mode" || key == "explore_mode")
