@@ -305,7 +305,7 @@ string CustomStringGameOption::loadFromString(const string &field,
                                               rc_line_type ltyp)
 {
     string new_value = field;
-    const string error = (caller->*set)(new_value);
+    const string error = set(caller, new_value);
     if (!error.empty())
         return name()+": "+error;
     value = new_value;
@@ -409,7 +409,7 @@ string CustomListGameOption::loadFromString_real(const string &field,
             new_entries.emplace_back(part);
     }
     merge_lists(new_value, new_entries, ltyp == RCFILE_LINE_CARET);
-    string error = (caller->*set)(new_value);
+    string error = set(caller, new_value);
     if (error.empty())
         error = GameOption::loadFromString(field, ltyp);
     if (error.empty())

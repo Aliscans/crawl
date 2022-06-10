@@ -82,8 +82,8 @@ public:
 
     bool was_loaded() const { return loaded; }
 
-    void (*on_change)(game_options *) = [](game_options *) {};
-    GameOption *set_on_change(void (*_on_change)(game_options *))
+    function<void(game_options *)> on_change = [](game_options *) {};
+    GameOption *set_on_change(function<void(game_options *)> _on_change)
     {
         on_change = _on_change;
         return this;
@@ -244,7 +244,7 @@ private:
 class CustomStringGameOption : public GameOption
 {
 public:
-    CustomStringGameOption(string (game_options::*_set)(const string &),
+    CustomStringGameOption(function<string(game_options*, const string&)> _set,
         vector<string> _names, game_options *_caller, string _default)
     : GameOption(_names), set(_set), caller(_caller), default_value(_default)
       { }
@@ -268,7 +268,7 @@ public:
     }
 
 private:
-    string (game_options::*set)(const string &);
+    function<string(game_options*, const string&)> set;
     game_options *caller;
     string value, default_value;
 };
@@ -333,8 +333,8 @@ private:
 class CustomListGameOption : public GameOption
 {
 public:
-    CustomListGameOption(string (game_options::*_set)(vector<string>&),
-                         void (*_convert_ltyp)(rc_line_type&),
+    CustomListGameOption(function<string(game_options*, vector<string>&)> _set,
+                         function<void(rc_line_type&)> _convert_ltyp,
                          vector<string> _names, game_options *_caller,
                          string _default_value = "",
                          string _separator = ",")
@@ -342,7 +342,7 @@ public:
           caller(_caller), default_value(_default_value), separator(_separator)
         { set_minus(); }
 
-    CustomListGameOption(string (game_options::*_set)(vector<string>&),
+    CustomListGameOption(function<string(game_options*, vector<string>&)> _set,
                          vector<string> _names, game_options *_caller,
                          string _default_value = "",
                          string _separator = ",")
@@ -366,8 +366,8 @@ public:
 private:
     string loadFromString_real(const string &field, rc_line_type ltyp,
                                bool trim = false);
-    string (game_options::*set)(vector<string>&);
-    void (*convert_ltyp)(rc_line_type&);
+    function<string(game_options*, vector<string>&)> set;
+    function<void(rc_line_type&)> convert_ltyp;
     void set_minus();
     game_options *caller;
     vector<string> value;

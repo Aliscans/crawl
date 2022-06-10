@@ -155,6 +155,133 @@ static void _rcfile_minus_to_plus(rc_line_type &rc)
         rc = RCFILE_LINE_PLUS;
 }
 
+static string _set_messages(vector<string> &fields, const string &name,
+                            vector<message_filter> &filters)
+{
+    vector<string> errors;
+    filters.clear();
+    for (string field : fields)
+    {
+        string error;
+        message_filter mf("");
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+        const size_t first = field.find(':');
+
+        if (field.npos == first)
+            mf = field;
+        else if (!first)
+            error = "No channel before :";
+        else if (field.size() == 1+first)
+            error = "No pattern after :";
+        else
+        {
+            const string chan = field.substr(0, first);
+            const string pattern = field.substr(first+1);
+            int channel = chan == "any" ? -1 : str_to_channel(chan, -2);
+            if (-2 == channel)
+                error = "Unknown channel \""+chan+"\"";
+            else
+                mf = message_filter(channel, pattern);
+        }
+
+        if (!error.empty())
+            errors.emplace_back(error);
+        else if (remove)
+            remove_matching(filters, mf);
+        else
+            filters.push_back(mf);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "("+name+") "+list;
+}
+
+static string _set_slot(vector<string> &fields, const string &name,
+                        vector<pair<text_pattern, string>> &auto_letters)
+{
+    vector<string> errors;
+    auto_letters.clear();
+    for (string field : fields)
+    {
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        string error;
+        const size_t first = field.find(':');
+        if (field.npos == first)
+            error = "Missing :";
+        else if (field.npos != field.find(':', first+1))
+            error = "Too many :s";
+        else if (!first)
+            error = "No pattern before :";
+        else if (field.size() == 1+first)
+            error = "No slot list after :";
+        else
+        {
+            text_pattern pattern(field.substr(0, first-1), true);
+            string slots(field.substr(first+1));
+            for (auto c: slots)
+                if (!isaalpha(c) && c != '-' && c != '+')
+                    error += make_stringf(", \"%c\"", c);
+            if (!error.empty())
+                error = "Bad slot characters: "+error.substr(2);
+            else
+            {
+                pair<text_pattern,string> entry(pattern, slots);
+                if (remove)
+                    remove_matching(auto_letters, entry);
+                else
+                    auto_letters.push_back(entry);
+            }
+        }
+        if (!error.empty())
+            errors.emplace_back(error);
+    }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "("+name+") "+list;
+}
+
+#ifdef USE_TILE
+static string _set_tile_offsets(const string &field, pair<int, int> &out)
+{
+    if (field == "reset")
+        out = {INT_MAX, INT_MAX};
+    else
+    {
+        int len = 0, x, y;
+        if (0 >= sscanf(field.c_str(), "%d,%d%n", &x, &y, &len) || field[len])
+            return "Invalid format: \""+field+"\".";
+        else if (abs(x) > 32 || abs(y) > 32)
+            return "Number out of range (not -32 to 32): \""+field+"\")";
+        else
+            out = {x, y};
+    }
+    return "";
+}
+
+static string _set_tile_scale(const string &field, int &out)
+{
+    int whole, frac = 0, l1 = 0, l2 = 0, l3 = 0;
+    auto match = sscanf(field.c_str(), "%3d%n.%2d%n%*d%n",
+                        &whole, &l1, &frac, &l2, &l3);
+    if (0 < match && '\0' == field[l3 > 0 ? l3 : l2 > 0 ? l2 : l1])
+    {
+        int tmp_scale = whole*100+frac;
+        if (20 <= tmp_scale && 1600 >= tmp_scale)
+        {
+            out = tmp_scale;
+            return "";
+        }
+    }
+    return "Can only accept values betwen 0.20 and 16.00, not \""+field+
+        "\" (match="+to_string(match)+").";
+}
+#endif
+
 const vector<colour_t> _ehc_list = {GREEN, GREEN, BROWN, BROWN, MAGENTA, RED};
 const string _enemy_hp_colour_default = comma_separated_fn(
     _ehc_list.begin(), _ehc_list.end(), colour_to_str, " ", " ");
@@ -237,6 +364,29 @@ const vector<GameOption*> game_options::build_options_list()
 #else
         false;
 #endif
+#endif
+
+    auto _set_spell_slot = [](game_options *g, vector<string> fields)
+        {return _set_slot(fields, "spell_slot", g->auto_spell_letters_w);};
+    auto _set_item_slot = [](game_options *g, vector<string> fields)
+        {return _set_slot(fields, "item_slot", g->auto_item_letters_w);};
+    auto _set_ability_slot = [](game_options *g, vector<string> fields)
+        {return _set_slot(fields, "ability_slot", g->auto_ability_letters_w);};
+    auto _set_force_more_message = [](game_options *g, vector<string> fields)
+        {return _set_messages(fields, "force_more_message",
+                              g->force_more_message_w);};
+    auto _set_flash_screen_message = [](game_options *g, vector<string> fields)
+        {return _set_messages(fields, "flash_screen_message",
+                              g->flash_screen_message_w);};
+#ifdef USE_TILE
+    auto _set_tile_weapon_offsets = [](game_options *g, string field)
+        {return _set_tile_offsets(field, g->tile_weapon_offsets_w);};
+    auto _set_tile_shield_offsets = [](game_options *g, string field)
+        {return _set_tile_offsets(field, g->tile_shield_offsets_w);};
+    auto _set_tile_viewport_scale = [](game_options *g, string field)
+        {return _set_tile_scale(field, g->tile_viewport_scale_w);};
+    auto _set_tile_map_scale = [](game_options *g, string field)
+        {return _set_tile_scale(field, g->tile_map_scale_w);};
 #endif
 
     #define SIMPLE_NAME(_opt) _opt, {#_opt}
@@ -373,12 +523,11 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(ability_menu), true),
         new BoolGameOption(SIMPLE_NAME(spell_menu), false),
         new BoolGameOption(SIMPLE_NAME(easy_floor_use), false),
-        new CustomListGameOption(&game_options::set_spell_slot,
-                                 {"spell_slot"}, this, "", "\n"),
-        new CustomListGameOption(&game_options::set_item_slot,
-                                 {"item_slot"}, this, "", "\n"),
-        new CustomListGameOption(&game_options::set_ability_slot,
-                                 {"ability_slot"}, this, "", "\n"),
+        new CustomListGameOption(_set_spell_slot, {"spell_slot"}, this, "",
+                                 "\n"),
+        new CustomListGameOption(_set_item_slot, {"item_slot"}, this, "", "\n"),
+        new CustomListGameOption(_set_ability_slot, {"ability_slot"}, this, "",
+                                 "\n"),
         new IntGameOption(SIMPLE_NAME(autofight_warning), 0, 0, 1000),
         new IntGameOption(SIMPLE_NAME(fail_severity_to_confirm), 3, -1, 5),
         new BoolGameOption(SIMPLE_NAME(easy_door), true),
@@ -434,9 +583,9 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(default_show_all_skills), false),
         new IntGameOption(SIMPLE_NAME(view_delay), DEFAULT_VIEW_DELAY, 0),
         new BoolGameOption(SIMPLE_NAME(darken_beyond_range), true),
-        new CustomListGameOption(&game_options::set_force_more_message,
+        new CustomListGameOption(_set_force_more_message,
                                  {"force_more_message"}, this),
-        new CustomListGameOption(&game_options::set_flash_screen_message,
+        new CustomListGameOption(_set_flash_screen_message,
                                  {"flash_screen_message"}, this),
         new BoolGameOption(SIMPLE_NAME(cloud_status), !is_tiles()),
         new BoolGameOption(SIMPLE_NAME(always_show_zot), false),
@@ -553,10 +702,10 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
 #ifdef USE_TILE
         new IntGameOption(SIMPLE_NAME(tile_map_pixels), 0, 0, INT_MAX),
-        new CustomStringGameOption(&game_options::set_tile_viewport_scale,
+        new CustomStringGameOption(_set_tile_viewport_scale,
                                    {"tile_viewport_scale"}, this, "1.00"),
-        new CustomStringGameOption(&game_options::set_tile_map_scale,
-                                   {"tile_map_scale"}, this, "0.60"),
+        new CustomStringGameOption(_set_tile_map_scale, {"tile_map_scale"},
+                                   this, "0.60"),
         new IntGameOption(SIMPLE_NAME(tile_cell_pixels), 32, 1, INT_MAX),
 #endif
 #ifdef USE_TILE_LOCAL
@@ -630,9 +779,9 @@ const vector<GameOption*> game_options::build_options_list()
 #ifdef USE_TILE
         new CustomStringGameOption(&game_options::set_player_tile,
                                    {"tile_player_tile"}, this, "normal"),
-        new CustomStringGameOption(&game_options::set_tile_weapon_offsets,
+        new CustomStringGameOption(_set_tile_weapon_offsets,
                                    {"tile_weapon_offsets"}, this, "reset"),
-        new CustomStringGameOption(&game_options::set_tile_shield_offsets,
+        new CustomStringGameOption(_set_tile_shield_offsets,
                                    {"tile_shield_offsets"}, this, "reset"),
 #endif
 #ifdef USE_TILE_WEB
@@ -1188,122 +1337,6 @@ string game_options::set_force_ability_targeter(vector<string> &fields)
     string list = comma_separated_line(errors.begin(), errors.end());
     return "(force_ability_targeter) "+list;
 
-}
-
-static string _set_slot(vector<string> &fields, const string &name,
-                        vector<pair<text_pattern, string>> &auto_letters)
-{
-    vector<string> errors;
-    auto_letters.clear();
-    for (string field : fields)
-    {
-        int remove = ' ' == field[0] ? 1 : 0;
-        field.erase(0, remove);
-
-        string error;
-        const size_t first = field.find(':');
-        if (field.npos == first)
-            error = "Missing :";
-        else if (field.npos != field.find(':', first+1))
-            error = "Too many :s";
-        else if (!first)
-            error = "No pattern before :";
-        else if (field.size() == 1+first)
-            error = "No slot list after :";
-        else
-        {
-            text_pattern pattern(field.substr(0, first-1), true);
-            string slots(field.substr(first+1));
-            for (auto c: slots)
-                if (!isaalpha(c) && c != '-' && c != '+')
-                    error += make_stringf(", \"%c\"", c);
-            if (!error.empty())
-                error = "Bad slot characters: "+error.substr(2);
-            else
-            {
-                pair<text_pattern,string> entry(pattern, slots);
-                if (remove)
-                    remove_matching(auto_letters, entry);
-                else
-                    auto_letters.push_back(entry);
-            }
-        }
-        if (!error.empty())
-            errors.emplace_back(error);
-    }
-    if (errors.empty())
-        return "";
-    string list = comma_separated_line(errors.begin(), errors.end());
-    return "("+name+") "+list;
-}
-
-string game_options::set_spell_slot(vector<string> &fields)
-{
-    return _set_slot(fields, "spell_slot", auto_spell_letters_w);
-}
-
-string game_options::set_item_slot(vector<string> &fields)
-{
-    return _set_slot(fields, "item_slot", auto_item_letters_w);
-}
-
-string game_options::set_ability_slot(vector<string> &fields)
-{
-    return _set_slot(fields, "ability_slot", auto_ability_letters_w);
-}
-
-static string _set_messages(vector<string> &fields, const string &name,
-                            vector<message_filter> &filters)
-{
-    vector<string> errors;
-    filters.clear();
-    for (string field : fields)
-    {
-        string error;
-        message_filter mf("");
-        int remove = ' ' == field[0] ? 1 : 0;
-        field.erase(0, remove);
-        const size_t first = field.find(':');
-
-        if (field.npos == first)
-            mf = field;
-        else if (!first)
-            error = "No channel before :";
-        else if (field.size() == 1+first)
-            error = "No pattern after :";
-        else
-        {
-            const string chan = field.substr(0, first);
-            const string pattern = field.substr(first+1);
-            int channel = chan == "any" ? -1 : str_to_channel(chan, -2);
-            if (-2 == channel)
-                error = "Unknown channel \""+chan+"\"";
-            else
-                mf = message_filter(channel, pattern);
-        }
-
-        if (!error.empty())
-            errors.emplace_back(error);
-        else if (remove)
-            remove_matching(filters, mf);
-        else
-            filters.push_back(mf);
-    }
-    if (errors.empty())
-        return "";
-    string list = comma_separated_line(errors.begin(), errors.end());
-    return "("+name+") "+list;
-}
-
-string game_options::set_force_more_message(vector<string> &fields)
-{
-    return _set_messages(fields, "force_more_message", force_more_message_w);
-}
-
-string game_options::set_flash_screen_message(vector<string> &fields)
-{
-    return _set_messages(fields, "flash_screen_message",
-                         flash_screen_message_w);
 }
 
 string game_options::set_travel_avoid_terrain(vector<string> &fields)
@@ -3195,33 +3228,6 @@ string game_options::set_player_tile(const string &field)
         return make_stringf("Invalid setting: \"%s\"", field.c_str());
     return "";
 }
-
-static string _set_tile_offsets(const string &field, pair<int, int> &out)
-{
-    if (field == "reset")
-        out = {INT_MAX, INT_MAX};
-    else
-    {
-        int len = 0, x, y;
-        if (0 >= sscanf(field.c_str(), "%d,%d%n", &x, &y, &len) || field[len])
-            return "Invalid format: \""+field+"\".";
-        else if (abs(x) > 32 || abs(y) > 32)
-            return "Number out of range (not -32 to 32): \""+field+"\")";
-        else
-            out = {x, y};
-    }
-    return "";
-}
-
-string game_options::set_tile_weapon_offsets(const string &field)
-{
-    return _set_tile_offsets(field, tile_weapon_offsets_w);
-}
-
-string game_options::set_tile_shield_offsets(const string &field)
-{
-    return _set_tile_offsets(field, tile_shield_offsets_w);
-}
 #endif // USE_TILE
 
 void game_options::do_kill_map(const string &from, const string &to)
@@ -4308,36 +4314,6 @@ string game_options::set_fire_items_start(const string &field)
     fire_items_start_w = letter_to_index(field[0]);
     return "";
 }
-
-#ifdef USE_TILE
-static string _set_tile_scale(int &out, const string &field)
-{
-    int whole, frac = 0, l1 = 0, l2 = 0, l3 = 0;
-    auto match = sscanf(field.c_str(), "%3d%n.%2d%n%*d%n",
-                        &whole, &l1, &frac, &l2, &l3);
-    if (0 < match && '\0' == field[l3 > 0 ? l3 : l2 > 0 ? l2 : l1])
-    {
-        int tmp_scale = whole*100+frac;
-        if (20 <= tmp_scale && 1600 >= tmp_scale)
-        {
-            out = tmp_scale;
-            return "";
-        }
-    }
-    return "Can only accept values betwen 0.20 and 16.00, not \""+field+
-        "\" (match="+to_string(match)+").";
-}
-
-string game_options::set_tile_viewport_scale(const string &field)
-{
-    return _set_tile_scale(tile_viewport_scale_w, field);
-}
-
-string game_options::set_tile_map_scale(const string &field)
-{
-    return _set_tile_scale(tile_map_scale_w, field);
-}
-#endif
 
 // Checks an include file name for safety and resolves it to a readable path.
 // If file cannot be resolved, returns the empty string (this does not throw!)

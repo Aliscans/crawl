@@ -709,10 +709,6 @@ public:
 
     void reset_aliases(bool clear=true);
     string set_fire_items_start(const string &s);
-#ifdef USE_TILE
-    string set_tile_viewport_scale(const string &s);
-    string set_tile_map_scale(const string &s);
-#endif
 private:
     string unalias(const string &key) const;
     string expand_vars(const string &field) const;
@@ -747,13 +743,6 @@ private:
     string set_note_skill_levels(vector<string> &fields);
     string set_force_spell_targeter(vector<string> &fields);
     string set_force_ability_targeter(vector<string> &fields);
-    string set_thingy_slot(vector<string> &fields, const string &name,
-                           vector<pair<text_pattern, string>> &auto_letters);
-    string set_spell_slot(vector<string> &fields);
-    string set_item_slot(vector<string> &fields);
-    string set_ability_slot(vector<string> &fields);
-    string set_force_more_message(vector<string> &fields);
-    string set_flash_screen_message(vector<string> &fields);
     string set_travel_avoid_terrain(vector<string> &fields);
     string set_sound(vector<string> &fields);
     string set_menu_colour(vector<string> &fields);
@@ -776,8 +765,6 @@ private:
     bool set_lang(const char *s);
     void set_fake_langs(const string &input);
     string set_player_tile(const string &s);
-    string set_tile_weapon_offsets(const string &s);
-    string set_tile_shield_offsets(const string &s);
     string add_force_spell_targeter(const string &s);
     string remove_force_spell_targeter(const string &s);
     string add_force_ability_targeter(const string &s);
