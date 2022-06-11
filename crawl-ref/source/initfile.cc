@@ -888,11 +888,10 @@ const vector<GameOption*> game_options::build_options_list()
     ASSERT(opt_colour);
     for (int c = 0; c < NUM_TERM_COLOURS; c++)
         colour_choice[c] = {colour_to_str(c), c};
-    for (int c = 0; c < NUM_TERM_COLOURS; c++)
+    for (unsigned c = 0; c < NUM_TERM_COLOURS; c++)
     {
-        const string colstr = colour_to_str(c);
-        auto opt = new MultipleChoiceGameOption<int> (colour[c],
-            {"colour."+colstr}, c, colour_choice);
+        const string name = "colour."+colour_to_str(c);
+        auto opt = new ColourGameOption(colour[c], {name}, c);
         opt->parent = opt_colour;
         options.push_back(opt);
     }

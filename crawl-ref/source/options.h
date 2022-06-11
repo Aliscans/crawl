@@ -241,7 +241,7 @@ public:
     confirm_prompt_type allow_self_target;      // yes, no, prompt
     bool        simple_targeting; // disable smart spell targeting
 
-    int         colour[16];      // macro fg colours to other colours
+    unsigned    colour[16];      // macro fg colours to other colours
     unsigned    background_colour; // select default background colour
     unsigned    foreground_colour; // select default foreground colour
     msg_colour_type channels[NUM_MESSAGE_CHANNELS];  // msg channel colouring
