@@ -892,7 +892,7 @@ const vector<GameOption*> game_options::build_options_list()
     {
         const string name = "colour."+colour_to_str(c);
         auto opt = new ColourGameOption(colour[c], {name}, c);
-        opt->parent = opt_colour;
+        opt_colour->add_child(opt);
         options.push_back(opt);
     }
 
@@ -913,7 +913,7 @@ const vector<GameOption*> game_options::build_options_list()
         string name = "channel."+message_channel_names[c];
         auto opt = new MultipleChoiceGameOption<msg_colour_type>(
             channels[c], {name}, MSGCOL_DEFAULT, channel_choice);
-        opt->parent = opt_channel;
+        opt_channel->add_child(opt);
         options.push_back(opt);
     }
     return options;
@@ -5991,7 +5991,8 @@ static string _option_line(const GameOption *option, int name_len, int text_len)
 bool edit_game_prefs(MenuGameOption *parent)
 {
     bool change = false;
-    auto list = Options.get_option_behaviour();
+    auto list = parent ? parent->children
+                       : Options.get_option_behaviour();
     string selected;
 
     // The caller should remove any user-provided formatting.

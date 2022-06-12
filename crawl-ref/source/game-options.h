@@ -118,9 +118,13 @@ class MenuGameOption : public GameOption
 public:
     MenuGameOption(vector<string> _names, MenuGameOption *_parent = nullptr) :
         GameOption(_names, _parent) { }
-    const string str() const override {    return "--->"; }
+    const string str() const override;
     string loadFromString(const string &field, rc_line_type ltyp) override;
     bool load_from_UI() override;
+    void add_child(GameOption *);
+    const vector<GameOption *> &children = children_w;
+private:
+    vector<GameOption *> children_w;
 };
 
 class BoolGameOption : public GameOption

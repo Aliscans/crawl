@@ -574,6 +574,25 @@ void CustomListGameOption::set_minus()
     use_minus = RCFILE_LINE_MINUS == r;
 }
 
+// Join the non-false options together
+const string MenuGameOption::str() const
+{
+    string out;
+    for (const auto g : children)
+    {
+        string gname = g->name(), myname = name(), val = g->str();
+        if (starts_with(gname, myname))
+            gname.erase(0, 1+myname.length()); // assume a . or _ comes next.
+        if ("true" == val)
+            out += ","+gname;
+        else if (!val.empty() && "false" != val)
+            out += ","+gname+":"+val;
+    }
+    if (out.empty())
+        return "--->";
+    return out.substr(1);
+}
+
 string MenuGameOption::loadFromString(const string &field, rc_line_type ltyp)
 {
     if (field.size())
@@ -584,4 +603,10 @@ string MenuGameOption::loadFromString(const string &field, rc_line_type ltyp)
 bool MenuGameOption::load_from_UI()
 {
     return edit_game_prefs(this);
+}
+
+void MenuGameOption::add_child(GameOption *g)
+{
+    g->parent = this;
+    children_w.emplace_back(g);
 }
