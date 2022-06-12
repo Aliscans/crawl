@@ -465,6 +465,7 @@ public:
         GameOption::reset();
     }
 
+    virtual
     string loadFromString(const std::string &field, rc_line_type ltyp) override
     {
         const auto choice = choices.find(field);
