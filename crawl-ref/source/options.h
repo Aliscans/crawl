@@ -709,6 +709,7 @@ public:
 
     void reset_aliases(bool clear=true);
     string set_fire_items_start(const string &s);
+    void set_option_ineffective(string option_name);
 private:
     string unalias(const string &key) const;
     string expand_vars(const string &field) const;

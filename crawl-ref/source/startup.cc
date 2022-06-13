@@ -1030,6 +1030,7 @@ bool startup_step()
 
     if (recent_error_messages() && !Options.suppress_startup_errors)
         replay_messages_during_startup();
+    Options.set_option_ineffective("suppress_startup_errors");
 
     // startup
 

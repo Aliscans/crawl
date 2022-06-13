@@ -89,6 +89,7 @@ public:
         return this;
     }
     MenuGameOption *parent;
+    bool ineffective = false;
 
 protected:
     vector<string> names;

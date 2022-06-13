@@ -1744,6 +1744,12 @@ void game_options::reset_paths()
 
 void game_options::reset_options()
 {
+    // XXX reuse part of the old option_behaviour list, if found.
+    vector<string> ineffective_options;
+    for (const GameOption *option : option_behaviour)
+        if (option->ineffective)
+            ineffective_options.emplace_back(option->name());
+
     // XXX: do we really need to rebuild the list and map every time?
     // Will they ever change within a single execution of Crawl?
     // GameOption::value's value will change of course, but not the reference.
@@ -1752,6 +1758,8 @@ void game_options::reset_options()
     options_by_name = build_options_map(option_behaviour);
     for (GameOption* option : option_behaviour)
         option->reset();
+    for (const string name : ineffective_options)
+        Options.set_option_ineffective(name);
 
     filename     = "unknown";
     basefilename = "unknown";
@@ -5981,6 +5989,11 @@ static string _option_line(const GameOption *option, int name_len, int text_len)
         if (iscntrl(c))
             c = ' ';
     value0 = replace_all(value0, "<", "<<");
+    if (option->ineffective)
+    {
+        name0 = "<darkgrey>("+name0.substr(0, name_len-2)+")</darkgrey>";
+        name_len += strlen("<darkgrey></darkgrey>");
+    }
     auto name = name0.c_str(), value = value0.c_str();
     return make_stringf("%-*.*s<%s>%s</%s>", name_len, name_len, name,
                                              colour, value, colour);
@@ -6038,6 +6051,20 @@ bool edit_game_prefs(MenuGameOption *parent)
     menu.show();
     return change;
 }
+
+// Set an option as "has no more effect on the current game".
+void game_options::set_option_ineffective(string option_name)
+{
+    GameOption *g = option_from_name(option_name);
+    if (!g)
+    {
+        dprf("set_option_ineffective called on non-GameOption '%s'.",
+             option_name);
+    }
+    else
+        g->ineffective = true;
+}
+
 
 ///////////////////////////////////////////////////////////////////////
 // system_environment
