@@ -137,6 +137,11 @@ static void _rcfile_plus_only(rc_line_type &rc)
     rc = RCFILE_LINE_PLUS;
 }
 
+static void _rcfile_equal_only(rc_line_type &rc)
+{
+    rc = RCFILE_LINE_EQUALS;
+}
+
 static void _rcfile_no_caret(rc_line_type &rc)
 {
     if (rc == RCFILE_LINE_CARET)
@@ -854,6 +859,10 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(use_fake_player_cursor), true),
         new BoolGameOption(SIMPLE_NAME(show_player_species), false),
         new BoolGameOption(SIMPLE_NAME(use_modifier_prefix_keys), true),
+        new CustomStringGameOption(&game_options::set_language,
+                                   {"language"}, this, "english"),
+        new CustomListGameOption(&game_options::set_fake_lang,
+                                 _rcfile_equal_only, {"fake_lang"}, this),
         new BoolGameOption(SIMPLE_NAME(read_persist_options), false),
         new GameOptionHeading("Miscellaneous: DOS and Windows"),
         new BoolGameOption(SIMPLE_NAME(dos_use_background_intensity), true),
@@ -2919,9 +2928,7 @@ void read_options(const string &s, bool runscript, bool clear_aliases)
 
 game_options::game_options()
     : seed(0), seed_from_rc(0),
-    no_save(false), no_player_bones(false), language(lang_t::EN),
-    lang_name(nullptr),
-    prefs_dirty(false)
+    no_save(false), no_player_bones(false), prefs_dirty(false)
 {
     reset_options();
 }
@@ -3748,6 +3755,16 @@ void game_options::read_option_line(const string &str, bool runscript)
         lowercase(field);
     }
 
+    // Allow language=xxx to set either a real language or a fake one,
+    // without needing a GameOption which handles both.
+    if (key == "language" && field != "german")
+    {
+        unwind_var<vector<flang_entry>> tmp(fake_langs_w);
+        vector<string> fields = {field};
+        if (set_fake_lang(fields).empty())
+            key = "fake_lang";
+    }
+
     GameOption *const *option = nullptr;
     if (subkey.size())
         option = map_find(options_by_name, key+"."+subkey);
@@ -3788,17 +3805,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.name = field;
     }
 #endif
-    else if (key == "language")
-    {
-        if (!set_lang(field.c_str()))
-        {
-            report_error("No translations for language '%s'.\n"
-                         "Languages with at least partial translation: %s",
-                         field.c_str(), _supported_language_listing().c_str());
-        }
-    }
-    else if (key == "fake_lang")
-        set_fake_langs(field);
     else if (key == "default_autopickup")
     {
         if (read_bool(field, true))
@@ -4226,34 +4232,25 @@ static string _supported_language_listing()
                               [](language_def){return true;});
 }
 
-bool game_options::set_lang(const char *lc)
+string game_options::set_language(const string &field)
 {
-    if (!lc)
-        return false;
+    string l = field;
+    if (2 < field.size() && (field[2] == '_' || field[2] == '-'))
+        l.resize(2);
 
-    if (lc[0] && lc[1] && (lc[2] == '_' || lc[2] == '-'))
-        return set_lang(string(lc, 2).c_str());
-
-    const string l = lowercase_string(lc); // Windows returns it capitalized.
     for (const auto &ldef : lang_data)
     {
         if ((ldef.code && l == ldef.code) || ldef.names.count(l))
         {
-            language = ldef.lang;
-            lang_name = ldef.code;
-            return true;
+            language_w = ldef.lang;
+            lang_name_w = ldef.code;
+            return "";
         }
     }
 
-    if (const flang_t * const flang = map_find(fake_lang_names, l))
-    {
-        // Handle fake languages for backwards-compatibility with old rcs.
-        // Override rather than stack, because that's how it used to work.
-        fake_langs = { { *flang, -1 } };
-        return true;
-    }
-
-    return false;
+    return make_stringf("No translations for language '%s'.\n"
+                        "Languages with at least partial translation: %s",
+                        field.c_str(), _supported_language_listing().c_str());
 }
 
 /**
@@ -4261,29 +4258,33 @@ bool game_options::set_lang(const char *lc)
  *
  * @param input     The value of the "fake_lang" field.
  */
-void game_options::set_fake_langs(const string &input)
+string game_options::set_fake_lang(vector<string> &fields)
 {
-    fake_langs.clear();
-    for (const string &flang_text : split_string(",", input))
+    fake_langs_w.clear();
+    vector<string> errors, tmp;
+    auto size = fields.size();
+    const int MAX_LANGS = 3;
+    if (size > MAX_LANGS)
     {
-        const int MAX_LANGS = 3;
-        if (fake_langs.size() >= (size_t) MAX_LANGS)
-        {
-            report_error("Too many fake langs; maximum is %d", MAX_LANGS);
-            break;
-        }
-
+        errors.push_back("Too many fake langs; maximum is "
+                         + to_string(MAX_LANGS));
+        size = MAX_LANGS;
+    }
+    for (unsigned n = 0; n < size; ++n)
+    {
+        const string &flang_text = fields[n];
         const vector<string> split_flang = split_string(":", flang_text);
         const string flang_name = split_flang[0];
         if (split_flang.size() > 2)
         {
-            report_error("Invalid fake-lang format: %s", flang_text.c_str());
+            errors.emplace_back("Invalid fake-lang format: "+flang_text);
             continue;
         }
 
         int tval = -1;
         const int value = split_flang.size() >= 2
-                          && parse_int(split_flang[1].c_str(), tval) ? tval : -1;
+                          && parse_int(split_flang[1].c_str(), tval) ? tval
+                                                                     : -1;
 
         const flang_t *flang = map_find(fake_lang_names, flang_name);
         if (flang)
@@ -4292,25 +4293,28 @@ void game_options::set_fake_langs(const string &input)
             {
                 if (*flang != flang_t::butt)
                 {
-                    report_error("Lang %s doesn't take a value",
-                                 flang_name.c_str());
+                    errors.emplace_back("Lang " + flang_name
+                                        + " doesn't take a value");
                     continue;
                 }
 
                 if (value == -1)
                 {
-                    report_error("Invalid value '%s' provided for lang",
-                                 split_flang[1].c_str());
+                    errors.emplace_back("Invalid value '" + split_flang[1]
+                                        + "' provided for lang");
                     continue;
                 }
             }
 
-            fake_langs.push_back({*flang, value});
+            fake_langs_w.push_back({*flang, value});
         }
         else
-            report_error("Unknown language %s!", flang_name.c_str());
-
+            errors.emplace_back("Unknown language "+flang_name+"!");
     }
+    if (errors.empty())
+        return "";
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "(fake_lang) "+list;
 }
 
 // Set "fire_items_start" or return an error message.

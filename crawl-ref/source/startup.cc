@@ -134,6 +134,7 @@ static void _initialize()
     // Initialise internal databases.
     _loading_message("Loading databases...");
     databaseSystemInit();
+    Options.set_option_ineffective("language");
 
     _loading_message("Loading spells and features...");
     init_feat_desc_cache();

@@ -451,12 +451,12 @@ public:
     bool        autopickup_search; // whether to annotate stash items with
                                    // autopickup status
 
-    lang_t              language;         // Translation to use.
-    const char*         lang_name;        // Database name of the language.
-    vector<flang_entry> fake_langs;       // The fake language(s) in use.
+    lang_t              language_w;       // Translation to use.
+    const char*         lang_name_w;      // Database name of the language.
+    vector<flang_entry> fake_langs_w;     // The fake language(s) in use.
     bool has_fake_lang(flang_t flang)
     {
-        return any_of(begin(fake_langs), end(fake_langs),
+        return any_of(begin(fake_langs_w), end(fake_langs_w),
                       [flang] (const flang_entry &f)
                       { return f.lang_id == flang; });
     }
@@ -687,6 +687,9 @@ public:
     // Order of sections in the character dump.
     const vector<string> &dump_order = dump_order_w;
     const int dump_item_origins = dump_item_origins_w;
+    const lang_t &language = language_w;
+    const char* const &lang_name = lang_name_w;
+    const vector<flang_entry> &fake_langs = fake_langs_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -763,8 +766,8 @@ private:
     string add_item_glyph_override(const string &);
     string remove_item_glyph_override(const string &);
     void set_option_fragment(const string &s, bool prepend);
-    bool set_lang(const char *s);
-    void set_fake_langs(const string &input);
+    string set_language(const string &field);
+    string set_fake_lang(vector<string> &fields);
     string set_player_tile(const string &s);
     string add_force_spell_targeter(const string &s);
     string remove_force_spell_targeter(const string &s);
