@@ -880,6 +880,8 @@ const vector<GameOption*> game_options::build_options_list()
         new ColourGameOption(SIMPLE_NAME(background_colour), BLACK),
         new ColourGameOption(SIMPLE_NAME(foreground_colour), LIGHTGREY),
         new BoolGameOption(SIMPLE_NAME(use_fake_cursor), USING_UNIX ),
+        new GameOptionHeading("Lua: Including lua files"),
+        new ListGameOption<string>(SIMPLE_NAME(terp_files)),
         new GameOptionHeading("Testing: Arena"),
         new BoolGameOption(SIMPLE_NAME(arena_dump_msgs), false),
         new BoolGameOption(SIMPLE_NAME(arena_dump_msgs_all), false),
@@ -1836,7 +1838,6 @@ void game_options::reset_options()
         explore_mode     = WIZ_NEVER;
     }
 #endif
-    terp_files.clear();
 
 #if defined(USE_TILE_LOCAL) && !defined(TOUCH_UI)
 
@@ -3792,7 +3793,7 @@ void game_options::read_option_line(const string &str, bool runscript)
 #endif
     }
     else if (key == "terp_file" && runscript)
-        terp_files.push_back(field);
+        read_option_line("terp_files += "+field, runscript);
     else if (key == "use_animations")
     {
         if (plain)

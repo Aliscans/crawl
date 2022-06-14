@@ -2983,9 +2983,9 @@ Lua functions can be macroed in-game by setting the macro action to "===",
 followed by the function name.
 
 The wizard-mode Lua interpreter (&^T) will, the first time it's invoked,
-load all of the files that are specified with the terp_file option:
+load the files that are specified with the terp_files option:
 
-terp_file = <path/name.lua>
+terp_files += <path/name.lua>
 
 The Lua in these files will have access to all of the Crawl Lua internals
 (that is, will be run in the context of dlua, not clua).

@@ -153,6 +153,7 @@ void debug_terp_dlua(CLua &vm)
                 mprf(MSGCH_ERROR, "Lua error: %s", vm.error.c_str());
         }
         _loaded_terp_files = true;
+        Options.set_option_ineffective("terp_files");
     }
     _run_dlua_interpreter(vm);
 }
