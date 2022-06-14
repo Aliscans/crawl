@@ -429,6 +429,8 @@ const vector<GameOption*> game_options::build_options_list()
         new StringGameOption(SIMPLE_NAME(sound_file_path), ""),
         new BoolGameOption(SIMPLE_NAME(one_SDL_sound_channel), false),
         new GameOptionHeading("Interface: Dropping and Picking up"),
+        new CustomStringGameOption(&game_options::set_autopickup,
+                                   {"autopickup"}, this, "$?!:\"=/"),
         new CustomListGameOption(&game_options::set_autopickup_exceptions,
                                  {"autopickup_exceptions"}, this),
         new BoolGameOption(SIMPLE_NAME(default_autopickup), true),
@@ -1801,15 +1803,6 @@ void game_options::reset_options()
 
     incremental_pregen = true;
     pregen_dungeon = false;
-
-    // set it to the .crawlrc default
-    autopickups.reset();
-    autopickups.set(OBJ_GOLD);
-    autopickups.set(OBJ_SCROLLS);
-    autopickups.set(OBJ_POTIONS);
-    autopickups.set(OBJ_BOOKS);
-    autopickups.set(OBJ_JEWELLERY);
-    autopickups.set(OBJ_WANDS);
 
     arena_dump_msgs        = false;
     arena_dump_msgs_all    = false;
@@ -3781,22 +3774,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         include(field, true, runscript);
     else if (key == "opt" || key == "option")
         split_parse(field, ",", &game_options::set_option_fragment);
-    else if (key == "autopickup")
-    {
-        // clear out autopickup
-        autopickups.reset();
-
-        char32_t c;
-        for (const char* tp = field.c_str(); int s = utf8towc(&c, tp); tp += s)
-        {
-            object_class_type type = item_class_by_sym(c);
-
-            if (type < NUM_OBJECT_CLASSES)
-                autopickups.set(type);
-            else
-                report_error("Bad object type '%*s' for autopickup.\n", s, tp);
-        }
-    }
 #if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
     else if (key == "name")
     {
@@ -4316,6 +4293,30 @@ string game_options::set_fire_items_start(const string &field)
         return "Can only accept a single letter, not \""+field+"\"";
     fire_items_start_w = letter_to_index(field[0]);
     return "";
+}
+
+// XXX This could be handled as a set of bools.
+string game_options::set_autopickup(const string &field)
+{
+    vector<string> errors;
+    // clear out autopickup
+    autopickups.reset();
+
+    char32_t c;
+    for (const char* tp = field.c_str(); int s = utf8towc(&c, tp); tp += s)
+    {
+        object_class_type type = item_class_by_sym(c);
+
+        if (type < NUM_OBJECT_CLASSES)
+            autopickups.set(type);
+        else
+            errors.emplace_back(string(tp, s));
+    }
+    if (errors.empty())
+        return "";
+    auto fn = [](const string &s) {return "\""+s+"\"";};
+    string list = comma_separated_fn(errors.begin(), errors.end(), fn);
+    return "Bad object type(s) for autopickup: "+list;
 }
 
 // Checks an include file name for safety and resolves it to a readable path.

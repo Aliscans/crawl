@@ -218,7 +218,6 @@ public:
     bool        equip_bar; // Show equip bar instead of noise bar.
     bool        animate_equip_bar; // Animate colours in equip bar.
 
-    FixedBitVector<NUM_OBJECT_CLASSES> autopickups; // items to autopickup
     bool        auto_switch;     // switch melee&ranged weapons according to enemy range
     travel_open_doors_type travel_open_doors; // open doors while exploring
     bool        easy_unequip;    // allow auto-removing of armour / jewellery
@@ -633,6 +632,7 @@ private:
     // Order of sections in the character dump.
     vector<string> dump_order_w;
     int dump_item_origins_w;                     // Show where items came from?
+    FixedBitVector<NUM_OBJECT_CLASSES> autopickups_w; // items to autopickup
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -690,6 +690,7 @@ public:
     const lang_t &language = language_w;
     const char* const &lang_name = lang_name_w;
     const vector<flang_entry> &fake_langs = fake_langs_w;
+    FixedBitVector<NUM_OBJECT_CLASSES> &autopickups = autopickups_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.
@@ -736,6 +737,7 @@ private:
     string add_fire_order_slot(const string &s);
     string set_fire_order_spell(vector<string> &fields);
     string set_fire_order_ability(vector<string> &fields);
+    string set_autopickup(const string &field);
     string set_autopickup_exceptions(vector<string> &fields);
     string set_autoinscribe(vector<string> &fields);
     void set_menu_sort(string field);
