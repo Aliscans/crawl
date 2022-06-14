@@ -2078,11 +2078,12 @@ void process_command(command_type cmd, command_type prev_cmd)
     case CMD_ENABLE_MORE:  crawl_state.show_more_prompt = true;  break;
 
     case CMD_TOGGLE_AUTOPICKUP:
-        if (Options.autopickup_on < 1)
-            Options.autopickup_on = 1;
+        if (Options.default_autopickup && you.allow_autopickup)
+            Options.default_autopickup = false;
         else
-            Options.autopickup_on = 0;
-        mprf("Autopickup is now %s.", Options.autopickup_on > 0 ? "on" : "off");
+            Options.default_autopickup = you.allow_autopickup = true;
+        mprf("Autopickup is now %s.", Options.default_autopickup ? "on"
+                                                                 : "off");
         break;
 
 #ifdef USE_SOUND

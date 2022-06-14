@@ -431,6 +431,7 @@ const vector<GameOption*> game_options::build_options_list()
         new GameOptionHeading("Interface: Dropping and Picking up"),
         new CustomListGameOption(&game_options::set_autopickup_exceptions,
                                  {"autopickup_exceptions"}, this),
+        new BoolGameOption(SIMPLE_NAME(default_autopickup), true),
         new BoolGameOption(SIMPLE_NAME(pickup_thrown), true),
         new MultipleChoiceGameOption<int>(SIMPLE_NAME(assign_item_slot),
             SS_FORWARD, {{"forward", SS_FORWARD}, {"backward", SS_BACKWARD}}),
@@ -1795,8 +1796,6 @@ void game_options::reset_options()
 #ifdef DGL_SIMPLE_MESSAGING
     messaging = true;
 #endif
-
-    autopickup_on    = 1;
 
     game = newgame_def();
 
@@ -3805,13 +3804,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         game.name = field;
     }
 #endif
-    else if (key == "default_autopickup")
-    {
-        if (read_bool(field, true))
-            autopickup_on = 1;
-        else
-            autopickup_on = 0;
-    }
     else if (key == "lua_file" && runscript)
     {
 #ifdef CLUA_BINDINGS

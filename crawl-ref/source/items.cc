@@ -3008,7 +3008,7 @@ bool can_autopickup()
     // [ds] Checking for autopickups == 0 is a bad idea because
     // autopickup is still possible with inscriptions and
     // pickup_thrown.
-    if (Options.autopickup_on <= 0)
+    if (!Options.default_autopickup || !you.allow_autopickup <= 0)
         return false;
 
     if (!i_feel_safe())

@@ -10,7 +10,7 @@
  * blink_brightens_background, bold_brightens_foreground,
  * best_effort_brighten_background, best_effort_brighten_foreground,
  * allow_extended_colours, pickup_thrown, easy_exit_menu,
- * dos_use_background_intensity, autopickup_on`; documented in
+ * dos_use_background_intensity, default_autopickup`; documented in
  * `docs/options_guide.txt`.
  *
  * It can also be used for global configuration of clua extensions.
@@ -23,6 +23,7 @@
 #include "clua.h"
 #include "libutil.h" // map_find
 #include "options.h"
+#include "player.h"
 
 typedef int (*ohandler)(lua_State *ls, const char *name, void *data, bool get);
 struct option_handler
@@ -51,7 +52,7 @@ static int option_hboolean(lua_State *ls, const char */*name*/, void *data,
 static int option_autopick(lua_State *ls, const char */*name*/, void */*data*/,
                            bool /*get*/)
 {
-    lua_pushboolean(ls, Options.autopickup_on>0);
+    lua_pushboolean(ls, Options.default_autopickup && you.allow_autopickup);
     return 1;
 }
 

@@ -1148,25 +1148,24 @@ static inline bool _monster_warning(activity_interrupt ai,
 // killed an invisible monster.
 void autotoggle_autopickup(bool off)
 {
-    if (off)
+    if (!Options.default_autopickup)
+        you.allow_autopickup = !off;
+    else if (off && you.allow_autopickup)
     {
-        if (Options.autopickup_on > 0)
-        {
-            Options.autopickup_on = -1;
-            mprf(MSGCH_WARN,
-                 "Deactivating autopickup; reactivate with <w>%s</w>.",
-                 command_to_string(CMD_TOGGLE_AUTOPICKUP).c_str());
-        }
-        if (crawl_state.game_is_hints())
-        {
-            learned_something_new(HINT_INVISIBLE_DANGER);
-            Hints.hints_seen_invisible = you.num_turns;
-        }
+        you.allow_autopickup = false;
+        mprf(MSGCH_WARN,
+             "Deactivating autopickup; reactivate with <w>%s</w>.",
+             command_to_string(CMD_TOGGLE_AUTOPICKUP).c_str());
     }
-    else if (Options.autopickup_on < 0) // was turned off automatically
+    else if (!off && !you.allow_autopickup)
     {
-        Options.autopickup_on = 1;
         mprf(MSGCH_WARN, "Reactivating autopickup.");
+        you.allow_autopickup = true;
+    }
+    if (off && crawl_state.game_is_hints())
+    {
+        learned_something_new(HINT_INVISIBLE_DANGER);
+        Hints.hints_seen_invisible = you.num_turns;
     }
 }
 

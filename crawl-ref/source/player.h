@@ -417,6 +417,9 @@ public:
     // Did the player trigger their spectral weapon this turn?
     bool triggered_spectral;
 
+    // If false, autopickup is being suppressed by a fear of unseen monsters
+    bool allow_autopickup;
+
     // TODO burn this API with fire
     bool wield_change;          // redraw weapon
     bool gear_change;           // redraw equip bar

@@ -576,7 +576,7 @@ autopickup_exceptions ^= <pickup-regex, >don't-pickup-regex, ...
         cases.
 
 default_autopickup = true
-        When set to false, the game starts with autopickup turned off.
+        When set to false, autopickup is turned off.
         You can still toggle autopickup in-game with Ctrl-A.
 
 pickup_thrown = true
