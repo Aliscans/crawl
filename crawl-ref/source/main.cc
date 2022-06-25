@@ -422,6 +422,7 @@ NORETURN static void _launch_game()
     init_hints_options();
 
     _set_removed_types_as_identified();
+    Options.mask_startup_options();
 
     Version::record(you.prev_save_version);
 

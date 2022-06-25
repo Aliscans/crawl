@@ -399,6 +399,7 @@ const vector<GameOption*> game_options::build_options_list()
     vector<GameOption*> options = {
         new GameOptionHeading("Starting Screen"),
 #if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
+        new StringGameOption(game.name, {"name"}, game.name),
         new BoolGameOption(SIMPLE_NAME(remember_name), true),
 #endif
         new BoolGameOption(game.fully_random, {"fully_random"}, false),
@@ -3775,13 +3776,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         include(field, true, runscript);
     else if (key == "opt" || key == "option")
         split_parse(field, ",", &game_options::set_option_fragment);
-#if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
-    else if (key == "name")
-    {
-        // field is already cleaned up from trim_string()
-        game.name = field;
-    }
-#endif
     else if (key == "lua_file" && runscript)
     {
 #ifdef CLUA_BINDINGS
@@ -6063,6 +6057,13 @@ void game_options::set_option_ineffective(string option_name)
         g->ineffective = true;
 }
 
+// Set various options in Options as "ineffective" as the game starts.
+void game_options::mask_startup_options()
+{
+    const vector<string> list = {"name"};
+    for (const string &l : list)
+        Options.set_option_ineffective(l);
+}
 
 ///////////////////////////////////////////////////////////////////////
 // system_environment
