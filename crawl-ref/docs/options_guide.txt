@@ -368,24 +368,21 @@ weapon += (short sword |...| unarmed | random | viable), <weapon>, ...
         shown if an illegal choice for the selected background is specified.
         The "viable" option makes a random choice from among the "good" weapons
         for the chosen character. Specifying more than one option causes the
-        game to randomly select a weapon from the given list. The combo option
-        overrides (and is overridden by) this option.
+        game to randomly select a weapon from the given list.
 
 species += (Human |...| Vampire | random | viable), <species>, ...
         (List option)
         The usual abbreviations (Hu, HO, etc.) work. "viable" will choose a
         viable species for a given background if the background is chosen
         first. Specifying multiple species causes one to be selected at
-        random from the given species. The combo option overrides (and is
-        overridden by) this option.
+        random from the given species.
 
 background += (Fighter |...| Wanderer | random | viable), <background>, ...
         (List option)
         Here again the abbreviations (Fi, Wz, AK, etc.) can be used. The same
         caveat applies to "viable": it is only really meaningful if the
         species option is also set. Specifying multiple backgrounds causes
-        one to be selected at random from the given species. The combo option
-        overrides (and is overridden by) this option.
+        one to be selected at random from the given species.
 
 combo += (HuFi . short sword | Human Monk | ...), <combo>, ...
         (List option)
@@ -393,8 +390,12 @@ combo += (HuFi . short sword | Human Monk | ...), <combo>, ...
         applicable) weapon. If a combo requires a weapon choice and one isn't
         specified, it is prompted for. Combos may be abbreviated or specified
         in full. If multiple combos are specified, one is selected randomly
-        from the specified combos. The weapon, species, and background
-        options are overridden by (and override) this option.
+        from the specified combos.
+
+use_combo = false
+        When true, Crawl refers to the combo option, rather than the species,
+        background and weapon ones, when creating a character. Setting one of
+        those options sets this one automatically.
 
 restart_after_game = maybe/true
         When set to true, at the game end, crawl will return to the main menu.

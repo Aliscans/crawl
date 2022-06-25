@@ -420,7 +420,7 @@ static void _choose_char(newgame_def& ng, newgame_def& choice,
 
     while (true)
     {
-        if (choice.allowed_combos.size())
+        if (choice.use_combo && choice.allowed_combos.size())
         {
             choice.species = SP_UNKNOWN;
             choice.job = JOB_UNKNOWN;
@@ -463,7 +463,7 @@ static void _choose_char(newgame_def& ng, newgame_def& choice,
                 }
             }
         }
-        else
+        else if (!choice.use_combo)
         {
             if (choice.allowed_species.size())
             {

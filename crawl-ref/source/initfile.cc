@@ -339,6 +339,126 @@ static const msg_channel_type message_channel_order[]  =
   MSGCH_DIAGNOSTICS, MSGCH_ERROR, MSGCH_TUTORIAL, MSGCH_ORB, MSGCH_HELL_EFFECT,
   MSGCH_DGL_MESSAGE, };
 
+template<typename T>
+string set_newgame_option(game_options *g, vector<T> &opt,
+                          function<string (T&, string)> conv, string name,
+                          vector<string> fields)
+{
+    vector<string> errors;
+    opt.clear();
+    for (string field : fields)
+    {
+        int remove = ' ' == field[0] ? 1 : 0;
+        field.erase(0, remove);
+
+        T out;
+        string error = conv(out, field);
+        if (!error.empty())
+            errors.push_back(error);
+        else if (remove)
+        {
+            auto it2 = find(opt.begin(), opt.end(), out);
+            if (opt.end() != it2)
+                opt.erase(it2);
+        }
+        else
+            opt.push_back(out);
+    }
+    if (errors.empty())
+    {
+        auto val = (name == "combo") ? "1" : "0";
+        g->read_option_line(string()+"use_combo="+val);
+        return "";
+    }
+    string list = comma_separated_line(errors.begin(), errors.end());
+    return "("+name+") "+list;
+}
+
+static string _str_to_weapon(weapon_type &out, const string str)
+{
+    weapon_type wpn = str_to_weapon(str);
+    if (WPN_UNKNOWN == wpn)
+        return "Unknown weapon choice: "+str+"\n";
+    out = wpn;
+    return "";
+}
+
+static string _set_weapon(game_options *g, vector<string> fields)
+{
+    return set_newgame_option<weapon_type>(g, g->game.allowed_weapons,
+                                           _str_to_weapon, "weapon", fields);
+}
+
+static string _str_to_species(species_type &ret, const string str)
+{
+    if (str == "random")
+        ret = SP_RANDOM;
+    else if (str == "viable")
+        ret = SP_VIABLE;
+    else
+    {
+        ret = SP_UNKNOWN;
+        if (str.length() == 2) // scan abbreviations
+            ret = species::from_abbrev(str.c_str());
+
+        // if we don't have a match, scan the full names
+        if (ret == SP_UNKNOWN && str.length() >= 2)
+            ret = species::from_str_loose(str, true);
+
+        if (!species::is_starting_species(ret))
+            ret = SP_UNKNOWN;
+
+        if (ret == SP_UNKNOWN)
+            return "Unknown species choice: " + str + "\n";
+    }
+    return "";
+}
+
+static string _set_species(game_options *g, vector<string> fields)
+{
+    return set_newgame_option<species_type>(g, g->game.allowed_species,
+                                            _str_to_species, "species", fields);
+}
+
+static string _str_to_job(job_type &job, const string &str)
+{
+    if (str == "random")
+        job = JOB_RANDOM;
+    else if (str == "viable")
+        job = JOB_VIABLE;
+    else
+    {
+        job = JOB_UNKNOWN;
+
+        if (str.length() == 2) // scan abbreviations
+            job = get_job_by_abbrev(str.c_str());
+
+        // if we don't have a match, scan the full names
+        if (job == JOB_UNKNOWN)
+            job = get_job_by_name(str.c_str());
+
+        if (!is_starting_job(job))
+            job = JOB_UNKNOWN;
+
+        if (job == JOB_UNKNOWN)
+            return "Unknown background choice: " + str + "\n";
+    }
+    return "";
+}
+
+static string _set_background(game_options *g, vector<string> fields)
+{
+    return set_newgame_option<job_type>(g, g->game.allowed_jobs,
+                                        _str_to_job, "background", fields);
+}
+
+static string _set_combo(game_options *g, vector<string> fields)
+{
+    auto str_to_str = [](string &out, const string &in) {out = in; return "";};
+    return set_newgame_option<string>(g, g->game.allowed_combos,
+                                      str_to_str, "combo", fields);
+}
+
 const vector<GameOption*> game_options::build_options_list()
 {
 #ifndef DEBUG
@@ -401,6 +521,12 @@ const vector<GameOption*> game_options::build_options_list()
 #if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
         new StringGameOption(game.name, {"name"}, game.name),
         new BoolGameOption(SIMPLE_NAME(remember_name), true),
+        new CustomListGameOption(_set_weapon, {"weapon"}, this),
+        new CustomListGameOption(_set_species, {"species", "race"}, this),
+        new CustomListGameOption(_set_background, {"background", "job",
+                                                   "class"}, this),
+        new CustomListGameOption(_set_combo, {"combo"}, this),
+        new BoolGameOption(game.use_combo, {"use_combo"}, false),
 #endif
         new BoolGameOption(game.fully_random, {"fully_random"}, false),
 #ifndef DGAMELAUNCH
@@ -1183,26 +1309,12 @@ static string _species_to_str(species_type sp)
 // XX move to species.cc?
 static species_type _str_to_species(const string &str)
 {
-    if (str == "random")
-        return SP_RANDOM;
-    else if (str == "viable")
-        return SP_VIABLE;
-
-    species_type ret = SP_UNKNOWN;
-    if (str.length() == 2) // scan abbreviations
-        ret = species::from_abbrev(str.c_str());
-
-    // if we don't have a match, scan the full names
-    if (ret == SP_UNKNOWN && str.length() >= 2)
-        ret = species::from_str_loose(str, true);
-
-    if (!species::is_starting_species(ret))
-        ret = SP_UNKNOWN;
-
-    if (ret == SP_UNKNOWN)
-        fprintf(stderr, "Unknown species choice: %s\n", str.c_str());
-
-    return ret;
+    species_type ret;
+    string error = _str_to_species(ret, str);
+    if (error.empty())
+        return ret;
+    fputs(error.c_str(), stderr);
+    return SP_UNKNOWN;
 }
 
 static string _job_to_str(job_type job)
@@ -1217,27 +1329,12 @@ static string _job_to_str(job_type job)
 
 job_type str_to_job(const string &str)
 {
-    if (str == "random")
-        return JOB_RANDOM;
-    else if (str == "viable")
-        return JOB_VIABLE;
-
-    job_type job = JOB_UNKNOWN;
-
-    if (str.length() == 2) // scan abbreviations
-        job = get_job_by_abbrev(str.c_str());
-
-    // if we don't have a match, scan the full names
-    if (job == JOB_UNKNOWN)
-        job = get_job_by_name(str.c_str());
-
-    if (!is_starting_job(job))
-        job = JOB_UNKNOWN;
-
-    if (job == JOB_UNKNOWN)
-        fprintf(stderr, "Unknown background choice: %s\n", str.c_str());
-
-    return job;
+    job_type ret;
+    string error = _str_to_job(ret, str);
+    if (error.empty())
+        return ret;
+    fputs(error.c_str(), stderr);
+    return JOB_UNKNOWN;
 }
 
 // read a value which can be either a boolean (in which case return
@@ -2777,11 +2874,11 @@ newgame_def read_startup_prefs()
     Options.merge(temp);
 
     if (!temp.game.allowed_species.empty())
-        temp.game.species = temp.game.allowed_species[0];
+        temp.game.species = *random_iterator(temp.game.allowed_species);
     if (!temp.game.allowed_jobs.empty())
-        temp.game.job = temp.game.allowed_jobs[0];
+        temp.game.job = *random_iterator(temp.game.allowed_jobs);
     if (!temp.game.allowed_weapons.empty())
-        temp.game.weapon = temp.game.allowed_weapons[0];
+        temp.game.weapon = *random_iterator(temp.game.allowed_weapons);
     if (!Options.seed_from_rc)
         Options.seed = temp.seed_from_rc;
     if (!Options.remember_name)
@@ -3622,20 +3719,6 @@ static const map<rc_line_type, string> rc_line_strings =
 
 void game_options::read_option_line(const string &str, bool runscript)
 {
-#define NEWGAME_OPTION(_opt, _conv, _type)                                     \
-    if (plain)                                                                 \
-        _opt.clear();                                                          \
-    for (const auto &part : split_string(",", field))                          \
-    {                                                                          \
-        if (minus_equal)                                                       \
-        {                                                                      \
-            auto it2 = find(_opt.begin(), _opt.end(), _conv(part));            \
-            if (it2 != _opt.end())                                             \
-                _opt.erase(it2);                                               \
-        }                                                                      \
-        else                                                                   \
-            _opt.push_back(_conv(part));                                       \
-    }
     string key    = "";
     string subkey = "";
     string field  = "";
@@ -3824,30 +3907,6 @@ void game_options::read_option_line(const string &str, bool runscript)
 #else
         game.type = _str_to_gametype(field);
 #endif
-    }
-    else if (key == "combo")
-    {
-        game.allowed_species.clear();
-        game.allowed_jobs.clear();
-        game.allowed_weapons.clear();
-        NEWGAME_OPTION(game.allowed_combos, string, string);
-    }
-    else if (key == "species" || key == "race")
-    {
-        game.allowed_combos.clear();
-        NEWGAME_OPTION(game.allowed_species, _str_to_species,
-                       species_type);
-    }
-    else if (key == "background" || key == "job" || key == "class")
-    {
-        game.allowed_combos.clear();
-        NEWGAME_OPTION(game.allowed_jobs, str_to_job, job_type);
-    }
-    else if (key == "weapon")
-    {
-        // Choose this weapon for backgrounds that get choice.
-        game.allowed_combos.clear();
-        NEWGAME_OPTION(game.allowed_weapons, str_to_weapon, weapon_type);
     }
 #ifndef DGAMELAUNCH
     // If DATA_DIR_PATH is set, don't set crawl_dir from .crawlrc.
@@ -5860,6 +5919,14 @@ bool parse_args(int argc, char **argv, bool rc_only)
     return true;
 }
 
+// Setting certain options changes other options. Changing the first option in
+// each pair causes edit_game_prefs() to redraw the second.
+static const vector<pair<string, string>> _refresh_other_on_change_strings =
+{
+    {"weapon", "use_combo"}, {"species", "use_combo"},
+    {"background", "use_combo"}, {"combo", "use_combo"},
+};
+
 class EGP_Menu : public Menu
 {
 public:
@@ -5964,10 +6031,31 @@ public:
         return key;
     }
 
-private:
+    vector<pair<MenuEntry*, MenuEntry*>> refresh_other_on_change() const
+    {
+        vector<pair<MenuEntry*, MenuEntry*>> out;
+        for (auto p : _refresh_other_on_change_strings)
+        {
+            pair<MenuEntry*, MenuEntry*> tmp = {nullptr, nullptr};
+            for (auto entry : all_items)
+            {
+                GameOption *opt = static_cast<GameOption*>(entry->data);
+                if (!opt)
+                    continue;
+                else if (opt->name() == p.first)
+                    tmp.first = entry;
+                else if (opt->name() == p.second)
+                    tmp.second = entry;
+            }
+            ASSERT(tmp.first && tmp.second);
+            out.emplace_back(tmp);
+        }
+        return out;
+    };
 
-    text_pattern search_pat;
+private:
     vector<MenuEntry*> all_items;
+    text_pattern search_pat;
     string base_title = "<w>Select a preference to set.</w>";
 };
 
@@ -5999,6 +6087,7 @@ bool edit_game_prefs(MenuGameOption *parent)
     auto list = parent ? parent->children
                        : Options.get_option_behaviour();
     string selected;
+    vector<pair<MenuEntry*, MenuEntry*>> refresh_other_on_change;
 
     // The caller should remove any user-provided formatting.
     EGP_Menu menu(parent, MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
@@ -6007,6 +6096,7 @@ bool edit_game_prefs(MenuGameOption *parent)
 
     int i = 0;
     string last_header;
+
     for (const auto option : list)
     {
         if (option->parent != parent)
@@ -6025,13 +6115,23 @@ bool edit_game_prefs(MenuGameOption *parent)
         const char letter = index_to_letter(i++ % 52);
         auto entry = new EGP_MenuEntry(line, MEL_ITEM, 1, letter, 36);
         entry->data = option;
-        entry->on_select = [&change, entry](const MenuEntry&)
+        entry->on_select = [&change, entry, &menu,
+                            &refresh_other_on_change](const MenuEntry&)
         {
             GameOption *opt = static_cast<GameOption*>(entry->data);
             if (opt->load_from_UI())
             {
+                for (auto conv : refresh_other_on_change)
+                {
+                    if (entry != conv.first)
+                        continue;
+                    auto entry2 = conv.second;
+                    auto opt2 = static_cast<GameOption*>(entry2->data);
+                    entry2->text = _option_line(opt2, 36, 79-36-4);
+                }
                 entry->text = _option_line(opt, 36, 79-36-4);
                 opt->on_change(&Options);
+                menu.update_menu(true);
                 change = true;
             }
             return true;
@@ -6039,6 +6139,7 @@ bool edit_game_prefs(MenuGameOption *parent)
         menu.add_entry_all(entry);
     }
 
+    refresh_other_on_change = menu.refresh_other_on_change();
     menu.set_hovered(0);
     menu.show();
     return change;
@@ -6060,7 +6161,8 @@ void game_options::set_option_ineffective(string option_name)
 // Set various options in Options as "ineffective" as the game starts.
 void game_options::mask_startup_options()
 {
-    const vector<string> list = {"name"};
+    const vector<string> list = {"name", "species", "background", "weapon",
+                                 "combo", "use_combo"};
     for (const string &l : list)
         Options.set_option_ineffective(l);
 }

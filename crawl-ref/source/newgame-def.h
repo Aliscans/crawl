@@ -54,6 +54,7 @@ struct newgame_def
     vector<species_type> allowed_species;
     vector<job_type> allowed_jobs;
     vector<weapon_type> allowed_weapons;
+    bool use_combo; // Use allowed_combos, not allowed_jobs etc..
 
     species_type species;
     job_type job;
