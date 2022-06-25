@@ -153,7 +153,6 @@ public:
     map<string, cglyph_t> item_glyph_cache;
 
     string      save_dir;       // Directory where saves and bones go.
-    string      macro_dir;      // Directory containing macro.txt
     string      morgue_dir;     // Directory where character dumps and morgue
                                 // dumps are saved. Overrides crawl_dir.
     string      shared_dir;     // Directory where the logfile, scores and bones
@@ -633,6 +632,7 @@ private:
     vector<string> dump_order_w;
     int dump_item_origins_w;                     // Show where items came from?
     FixedBitVector<NUM_OBJECT_CLASSES> autopickups_w; // items to autopickup
+    string      macro_dir_w;      // Directory containing macro.txt
 
 public:
     const int &fire_items_start = fire_items_start_w;
@@ -691,6 +691,7 @@ public:
     const char* const &lang_name = lang_name_w;
     const vector<flang_entry> &fake_langs = fake_langs_w;
     FixedBitVector<NUM_OBJECT_CLASSES> &autopickups = autopickups_w;
+    const string macro_dir = macro_dir_w;
 
     bool prefs_dirty;
     // Fix option values if necessary, specifically file paths.

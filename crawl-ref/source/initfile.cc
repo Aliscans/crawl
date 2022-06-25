@@ -112,6 +112,8 @@ game_options Options;
 
 static string _get_save_path(string subdir);
 static string _supported_language_listing();
+static string _resolve_dir(string path, string suffix);
+static string _user_home_subpath(const string &subpath);
 
 static bool _first_less(const pair<int, int> &l, const pair<int, int> &r)
 {
@@ -459,6 +461,27 @@ static string _set_combo(game_options *g, vector<string> fields)
                                       str_to_str, "combo", fields);
 }
 
+static string _default_macro_dir()
+{
+    string macro_dir = SysEnv.macro_dir;
+#ifndef DGAMELAUNCH
+    if (macro_dir.empty())
+    {
+#ifdef UNIX
+        macro_dir = _user_home_subpath(".crawl");
+#else
+        macro_dir = "settings/";
+#endif
+    }
+#endif
+
+#if defined(TARGET_OS_MACOSX)
+    if (SysEnv.macro_dir.empty())
+        macro_dir  = _get_save_path("");
+#endif
+    return macro_dir;
+}
+
 const vector<GameOption*> game_options::build_options_list()
 {
 #ifndef DEBUG
@@ -513,6 +536,10 @@ const vector<GameOption*> game_options::build_options_list()
     auto _set_tile_map_scale = [](game_options *g, string field)
         {return _set_tile_scale(field, g->tile_map_scale_w);};
 #endif
+#if !defined(DGAMELAUNCH) && !defined(SAVE_DIR_PATH)
+    auto _set_macro_dir = [](game_options *g, const string &field)
+        {g->macro_dir_w = _resolve_dir(field, ""); return "";};
+#endif
 
     #define SIMPLE_NAME(_opt) _opt, {#_opt}
     MenuGameOption *opt_colour = nullptr, *opt_channel = nullptr;
@@ -550,6 +577,10 @@ const vector<GameOption*> game_options::build_options_list()
 #ifndef DGAMELAUNCH
         new StringGameOption(SIMPLE_NAME(morgue_dir),
                              _get_save_path("morgue/")),
+#endif
+#if !defined(DGAMELAUNCH) && !defined(SAVE_DIR_PATH)
+        new CustomStringGameOption(_set_macro_dir, {"macro_dir"}, this,
+                                   _default_macro_dir()),
 #endif
         new BoolGameOption(SIMPLE_NAME(sounds_on), true),
         new CustomListGameOption(&game_options::set_sound, {"sound"}, this),
@@ -1825,33 +1856,18 @@ static string _get_save_path(string subdir)
  */
 void game_options::reset_paths()
 {
-    macro_dir = SysEnv.macro_dir;
-
+#if !defined(DGAMELAUNCH) && !defined(SAVE_DIR_PATH)
+    option_from_name("macro_dir")->reset();
+#else
+    macro_dir_w = _default_macro_dir();
+#endif
     save_dir = _get_save_path("saves/");
     morgue_dir = _get_save_path("morgue/");
-
-#ifndef DGAMELAUNCH
-    if (macro_dir.empty())
-    {
-#ifdef UNIX
-        macro_dir = _user_home_subpath(".crawl");
-#else
-        macro_dir = "settings/";
-#endif
-    }
-#endif
-
-#if defined(TARGET_OS_MACOSX)
-    if (SysEnv.macro_dir.empty())
-        macro_dir  = _get_save_path("");
-#endif
-
 #if defined(SHARED_DIR_PATH)
     shared_dir = _resolve_dir(SHARED_DIR_PATH, "");
 #else
     shared_dir = save_dir;
 #endif
-
 }
 
 void game_options::reset_options()
@@ -3931,8 +3947,6 @@ void game_options::read_option_line(const string &str, bool runscript)
         shared_dir = save_dir;
 #endif
     }
-    else if (key == "macro_dir")
-        macro_dir = _resolve_dir(field, "");
 #endif
 #endif
     else if (key == "view_lock")
