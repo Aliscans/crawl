@@ -433,6 +433,10 @@ static help_file help_files[] =
     { "quickstart.txt",     '^', false },
     { "macros_guide.txt",  '~', false },
     { "options_guide.txt", '&', false },
+    { "arena.txt", CONTROL('A'), false }, // only in options menu.
+#ifdef WIZARD
+    { "fight_simulator.txt", CONTROL('F'), false }, // only in options menu.
+#endif // WIZARD
 #ifdef USE_TILE_LOCAL
     { "tiles_help.txt",    't', false },
 #endif
@@ -1429,4 +1433,75 @@ void show_help(int section, string highlight_string)
     // handle the case where one of the special case help sections is triggered
     // from the help main menu.
     _show_help_special(key);
+}
+
+struct help_file_line {int section; int line;};
+// XXX - This looks for specific strings in the text. Turn it into markdown?
+static map<string, help_file_line>& _option_help_lines()
+{
+    static map<string, help_file_line> option_help_lines;
+    if (!option_help_lines.empty())
+        return option_help_lines;
+
+    formatted_string help, unused1;
+
+    // Remember anything which starts with "some_thing [+-^]?= "
+    int line = 0, section = '&', unused2; // options_guide.txt
+    _get_help_section(section, unused1, help, unused2);
+    for (auto text : help.ops)
+    {
+        auto space = text.text.find(' ');
+        if (space && strchr("= ", text.text[space+2])
+            && space != text.text.npos && strchr("+-^=", text.text[space+1]))
+        {
+            option_help_lines[text.text.substr(0, space)] = {section, line};
+        }
+        line++;
+    }
+    // Remember anything which starts with "* some_thing: "
+    line = 0, section = CONTROL('A'); // arena.txt
+    _get_help_section(section, unused1, help, unused2);
+    for (auto text : help.ops)
+    {
+        auto space = text.text.find(" ", 2), colon = text.text.find(':', 2);
+        auto star = text.text.compare(0, 2, "* ");
+        if (!star && colon > 2 && colon != string::npos && colon+1 == space)
+            option_help_lines[text.text.substr(2, colon-2)] = {section, line};
+        line++;
+    }
+
+#ifdef WIZARD
+    // Remember anything which starts with "some_thing [+-^]?= "
+    line = 0, section = CONTROL('F'); // fight_simulator.txt
+    _get_help_section(section, unused1, help, unused2);
+    for (auto text : help.ops)
+    {
+        auto space = text.text.find_first_of(" :", 0, 2),
+             colon = text.text.find(':');
+        if (space && colon && space != string::npos && colon != string::npos)
+            option_help_lines[text.text.substr(0, space)] = {section, line};
+        line++;
+    }
+#endif // WIZARD
+    return option_help_lines;
+}
+
+// This is a help browser with the "offset in a text file" form of help_popup
+// and the string keys of show_specific_help().
+void show_option_help(const string &name)
+{
+    auto option_help_lines = _option_help_lines();
+    formatted_string help, unused1;
+    int unused2;
+    formatted_scroller scr(FS_PREWRAPPED_TEXT);
+    if (!option_help_lines.count(name))
+        _get_help_section('&', unused1, help, unused2);
+    else
+    {
+        _get_help_section(option_help_lines[name].section, unused1, help,
+                          unused2);
+        scr.set_scroll(option_help_lines[name].line);
+    }
+    scr.add_raw_text(help, false);
+    scr.show();
 }

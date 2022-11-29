@@ -29,6 +29,7 @@ void show_skill_menu_help();
 void show_spell_library_help();
 
 void show_help(int section = CK_HOME, string highlight_string = "");
+void show_option_help(const string &name);
 
 int show_keyhelp_menu(const vector<formatted_string> &lines);
 

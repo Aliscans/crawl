@@ -30,6 +30,7 @@
 #include "chardump.h"
 #include "clua.h"
 #include "colour.h"
+#include "command.h"
 #include "defines.h"
 #include "delay.h"
 #include "describe.h"
@@ -6030,18 +6031,22 @@ public:
 
     string get_keyhelp(bool) const override
     {
-        return"<lightgrey>"
-            "[<w>Up</w>|<w>Down</w>] select  "
-            "[<w>PgDn</w>|<w>></w>] page down  "
-            "[<w>PgUp</w>|<w><<</w>] page up  "
-            "[<w>Esc</w>] close  "
-            "[<w>Ctrl-f</w>] search  "
-            "</lightgrey>";
+        return "<lightgrey>[<w>Up</w>|<w>Down</w>|<w>PgUp</w>|<w><<</w>"
+               "|<w>PgDn</w>|<w>></w>] select  "
+               "[<w>Esc</w>] close  "
+               "[<w>Ctrl-f</w>] search "
+               "[<w>?</w>] help</lightgrey>";
     }
     int pre_process(int key) override
     {
         if (CONTROL('F') == key)
             return filter_items();
+        if ('?' == key)
+        {
+            const auto *g = static_cast<GameOption*>(items[last_hovered]->data);
+            show_option_help(g->name());
+            return CK_NO_KEY;
+        }
         return key;
     }
 

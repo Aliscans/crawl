@@ -5,6 +5,7 @@
 
 #include "AppHdr.h"
 
+#include "command.h"
 #include "game-options.h"
 #include "initfile.h"
 #include "lookup-help.h"
@@ -96,6 +97,24 @@ bool read_bool(const string &field, bool def_value)
     return def_value;
 }
 
+class option_chooser : public Menu
+{
+public:
+    option_chooser(int _flags, string _name) : Menu(_flags), name(_name) { }
+    int pre_process(int key) override
+    {
+        if ('?' == key)
+        {
+            show_option_help(name);
+            return static_cast<int>(CK_NO_KEY);
+        }
+        else
+            return key;
+    }
+private:
+    string name;
+};
+
 /// Ask the user to choose between a set of options.
 ///
 /// @param[in] prompt Text to put above the options. Typically a question.
@@ -103,13 +122,13 @@ bool read_bool(const string &field, bool def_value)
 /// @param[in] def_value Value of default option (as string).
 /// @returns The selected option if something was selected, or "" if the prompt
 ///          was cancelled.
-static string _choose_one_from_list(const string prompt,
+static string _choose_one_from_list(const string prompt, const string name,
                                     const vector<string> options,
                                     const string def_value)
 {
     // The caller should remove any user-provided formatting.
-    Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
-              | MF_ALLOW_FORMATTING | MF_INIT_HOVER);
+    option_chooser menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
+                       | MF_ALLOW_FORMATTING | MF_INIT_HOVER, name);
 
     menu.set_title(new MenuEntry(prompt, MEL_TITLE));
 
@@ -139,8 +158,9 @@ static string _choose_one_from_list(const string prompt,
 /// @returns       True if something is chosen, false otherwise.
 bool choose_option_from_UI(GameOption *caller, vector<string> choices)
 {
-    string prompt = string("Select a value for ")+caller->name()+":";
-    string selected = _choose_one_from_list(prompt, choices, caller->str());
+    string prompt = "Select a value for "+caller->name()+" (? for help):";
+    string selected = _choose_one_from_list(prompt, caller->name(), choices,
+                                            caller->str());
     if (!selected.empty())
         caller->loadFromString(selected, RCFILE_LINE_EQUALS);
     return !selected.empty();
@@ -441,8 +461,9 @@ class CLGO_Menu : public Menu
 public:
     bool changed = false;
 
-    CLGO_Menu(int _flags, vector<string> &_list, bool _use_minus)
-        : Menu(_flags), list(_list), use_minus(_use_minus) { reset_items(); }
+    CLGO_Menu(int _flags, string _name, vector<string> &_list, bool _use_minus)
+        : Menu(_flags), name(_name), list(_list), use_minus(_use_minus)
+        { reset_items(); }
 
     int pre_process(int key) override
     {
@@ -478,6 +499,11 @@ public:
         }
         else if (CK_BKSP == key || CK_DELETE == key)
             key = CK_ENTER; // sorry, no 1 key delete without an undelete.
+        else if ('?' == key)
+        {
+            show_option_help(name);
+            key = CK_NO_KEY;
+        }
         return key;
     }
 
@@ -504,6 +530,7 @@ public:
 
 private:
     const string dummy_string = "<h>Press + to set this option.</h>";
+    string name;
     vector<string> &list;
     bool use_minus;
 };
@@ -513,11 +540,13 @@ bool CustomListGameOption::load_from_UI()
     string prompt = string("Select a line to edit for \"")+name()+"\":";
 
     CLGO_Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
-                   | MF_ALLOW_FORMATTING | MF_INIT_HOVER, value, use_minus);
+                   | MF_ALLOW_FORMATTING | MF_INIT_HOVER,
+                   name(), value, use_minus);
     menu.set_title(new MenuEntry(prompt, MEL_TITLE));
-    const string rem = use_minus ? "  [<w>-</w>] insert a REMOVE line" : "";
+    const string rem = use_minus ? "  [<w>-</w>] add a REMOVE line" : "";
     const string more = "<lightgrey>[<w>(</w>] move up  [<w>)</w>] move down"
-                        "  [<w>+</w>] insert an ADD line"+rem+"</lightgrey>";
+                          "  [<w>+</w>] add an ADD line"+rem
+                        + "  [<w>?</w>] help</lightgrey>";
     menu.set_more(formatted_string::parse_string(more));
 
     menu.on_single_selection = [this, &menu](const MenuEntry &entry)
