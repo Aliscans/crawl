@@ -68,7 +68,7 @@ static bool _choose_weapon(newgame_def& ng, newgame_def& ng_choice,
 
 newgame_def::newgame_def()
     : name(), type(GAME_TYPE_NORMAL),
-      seed(0), pregenerate(false),
+      seed(0), pregenerate(false), use_combo(false),
       species(SP_UNKNOWN), job(JOB_UNKNOWN),
       weapon(WPN_UNKNOWN),
       fully_random(false)
