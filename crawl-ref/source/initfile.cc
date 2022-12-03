@@ -6066,8 +6066,9 @@ public:
                 else if (opt->name() == p.second)
                     tmp.second = entry;
             }
-            ASSERT(tmp.first && tmp.second);
-            out.emplace_back(tmp);
+            ASSERT(!tmp.first == !tmp.second);
+            if (tmp.first && tmp.second)
+                out.emplace_back(tmp);
         }
         return out;
     };
