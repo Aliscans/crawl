@@ -5,7 +5,6 @@
 
 #include "AppHdr.h"
 
-#include "command.h"
 #include "game-options.h"
 #include "initfile.h"
 #include "lookup-help.h"
@@ -100,19 +99,20 @@ bool read_bool(const string &field, bool def_value)
 class option_chooser : public Menu
 {
 public:
-    option_chooser(int _flags, string _name) : Menu(_flags), name(_name) { }
+    option_chooser(int _flags, GameOption *_caller)
+        : Menu(_flags), caller(_caller) { }
     int pre_process(int key) override
     {
         if ('?' == key)
         {
-            show_option_help(name);
+            caller->show_help();
             return static_cast<int>(CK_NO_KEY);
         }
         else
             return key;
     }
 private:
-    string name;
+    GameOption *caller;
 };
 
 /// Ask the user to choose between a set of options.
@@ -122,13 +122,13 @@ private:
 /// @param[in] def_value Value of default option (as string).
 /// @returns The selected option if something was selected, or "" if the prompt
 ///          was cancelled.
-static string _choose_one_from_list(const string prompt, const string name,
+static string _choose_one_from_list(const string prompt, GameOption *caller,
                                     const vector<string> options,
                                     const string def_value)
 {
     // The caller should remove any user-provided formatting.
     option_chooser menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
-                       | MF_ALLOW_FORMATTING | MF_INIT_HOVER, name);
+                       | MF_ALLOW_FORMATTING | MF_INIT_HOVER, caller);
 
     menu.set_title(new MenuEntry(prompt, MEL_TITLE));
 
@@ -159,7 +159,7 @@ static string _choose_one_from_list(const string prompt, const string name,
 bool choose_option_from_UI(GameOption *caller, vector<string> choices)
 {
     string prompt = "Select a value for "+caller->name()+" (? for help):";
-    string selected = _choose_one_from_list(prompt, caller->name(), choices,
+    string selected = _choose_one_from_list(prompt, caller, choices,
                                             caller->str());
     if (!selected.empty())
         caller->loadFromString(selected, RCFILE_LINE_EQUALS);
@@ -190,6 +190,17 @@ bool load_string_from_UI(GameOption *caller)
         show_type_response(error);
         old = select;
     }
+}
+
+void GameOption::set_help(int _file, int _line)
+{
+    help_file = _file;
+    help_line = _line;
+}
+
+void GameOption::set_help(GameOption *other)
+{
+    set_help(other->help_file, other->help_line);
 }
 
 string GameOption::loadFromString(const string &, rc_line_type ltyp)
@@ -461,8 +472,9 @@ class CLGO_Menu : public Menu
 public:
     bool changed = false;
 
-    CLGO_Menu(int _flags, string _name, vector<string> &_list, bool _use_minus)
-        : Menu(_flags), name(_name), list(_list), use_minus(_use_minus)
+    CLGO_Menu(int _flags, GameOption *_caller, vector<string> &_list,
+              bool _use_minus)
+        : Menu(_flags), caller(_caller), list(_list), use_minus(_use_minus)
         { reset_items(); }
 
     int pre_process(int key) override
@@ -501,7 +513,7 @@ public:
             key = CK_ENTER; // sorry, no 1 key delete without an undelete.
         else if ('?' == key)
         {
-            show_option_help(name);
+            caller->show_help();
             key = CK_NO_KEY;
         }
         return key;
@@ -530,7 +542,7 @@ public:
 
 private:
     const string dummy_string = "<h>Press + to set this option.</h>";
-    string name;
+    GameOption *caller;
     vector<string> &list;
     bool use_minus;
 };
@@ -541,7 +553,7 @@ bool CustomListGameOption::load_from_UI()
 
     CLGO_Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
                    | MF_ALLOW_FORMATTING | MF_INIT_HOVER,
-                   name(), value, use_minus);
+                   this, value, use_minus);
     menu.set_title(new MenuEntry(prompt, MEL_TITLE));
     const string rem = use_minus ? "  [<w>-</w>] add a REMOVE line" : "";
     const string more = "<lightgrey>[<w>(</w>] move up  [<w>)</w>] move down"

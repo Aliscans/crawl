@@ -545,7 +545,6 @@ const vector<GameOption*> game_options::build_options_list()
     #define SIMPLE_NAME(_opt) _opt, {#_opt}
     MenuGameOption *opt_colour = nullptr, *opt_channel = nullptr;
     vector<GameOption*> options = {
-        new GameOptionHeading("Starting Screen"),
 #if !defined(DGAMELAUNCH) || defined(DGL_REMEMBER_NAME)
         new StringGameOption(game.name, {"name"}, game.name),
         new BoolGameOption(SIMPLE_NAME(remember_name), true),
@@ -574,7 +573,6 @@ const vector<GameOption*> game_options::build_options_list()
             ->set_on_change(_dirty_prefs),
         new BoolGameOption(SIMPLE_NAME(autopickup_starting_ammo), true),
         new BoolGameOption(SIMPLE_NAME(suppress_startup_errors), false),
-        new GameOptionHeading("File System and Sound"),
 #ifndef DGAMELAUNCH
         new StringGameOption(SIMPLE_NAME(morgue_dir),
                              _get_save_path("morgue/")),
@@ -587,7 +585,6 @@ const vector<GameOption*> game_options::build_options_list()
         new CustomListGameOption(&game_options::set_sound, {"sound"}, this),
         new StringGameOption(SIMPLE_NAME(sound_file_path), ""),
         new BoolGameOption(SIMPLE_NAME(one_SDL_sound_channel), false),
-        new GameOptionHeading("Interface: Dropping and Picking up"),
         new CustomStringGameOption(&game_options::set_autopickup,
                                    {"autopickup"}, this, "$?!:\"=/"),
         new CustomListGameOption(&game_options::set_autopickup_exceptions,
@@ -598,13 +595,9 @@ const vector<GameOption*> game_options::build_options_list()
             SS_FORWARD, {{"forward", SS_FORWARD}, {"backward", SS_BACKWARD}}),
         new IntGameOption(SIMPLE_NAME(pickup_menu_limit), 1),
         new ListGameOption<text_pattern>(SIMPLE_NAME(drop_filter)),
-        new GameOptionHeading(
-            "Interface: Passive Sightings (detected and remembered entities)"),
         new ColourGameOption(SIMPLE_NAME(detected_monster_colour), LIGHTRED),
         new ColourGameOption(SIMPLE_NAME(detected_item_colour), GREEN),
         new ColourGameOption(SIMPLE_NAME(remembered_monster_colour), DARKGREY),
-        new GameOptionHeading(
-            "Interface: Dungeon View Item and Monster Highlighting"),
         // [ds] Default to jazzy colours.
         new CursesGameOption(SIMPLE_NAME(friend_highlight),
                              CHATTR_HILITE | (GREEN << 8)),
@@ -617,9 +610,7 @@ const vector<GameOption*> game_options::build_options_list()
         new CursesGameOption(SIMPLE_NAME(heap_highlight), CHATTR_REVERSE),
         new CursesGameOption(SIMPLE_NAME(feature_item_highlight), CHATTR_REVERSE),
         new CursesGameOption(SIMPLE_NAME(trap_item_highlight), CHATTR_REVERSE),
-        new GameOptionHeading("Interface: Level Map Functions"),
         new IntGameOption(SIMPLE_NAME(level_map_cursor_step), 7, 1, 50),
-        new GameOptionHeading("Interface: Viewport Display Options"),
         // These need to be odd, hence allow +1.
         new IntGameOption(SIMPLE_NAME(view_max_width),
                       max(VIEW_BASE_WIDTH, VIEW_MIN_WIDTH),
@@ -633,7 +624,6 @@ const vector<GameOption*> game_options::build_options_list()
         new IntGameOption(SIMPLE_NAME(scroll_margin_x), 2, 0),
         new IntGameOption(SIMPLE_NAME(scroll_margin_y), 2, 0),
         new BoolGameOption(SIMPLE_NAME(always_show_exclusions), true),
-        new GameOptionHeading("Interface: Travel and Exploration"),
         new IntGameOption(SIMPLE_NAME(travel_delay), USING_DGL ? -1 : 20,
                           -1, 2000),
         new IntGameOption(SIMPLE_NAME(explore_delay), -1, -1, 2000),
@@ -664,7 +654,6 @@ const vector<GameOption*> game_options::build_options_list()
              {{"avoid", travel_open_doors_type::avoid},
               {"approach", travel_open_doors_type::approach},
               {"open", travel_open_doors_type::open}}),
-        new GameOptionHeading("Interface: Command Enhancements"),
         new BoolGameOption(SIMPLE_NAME(auto_switch), false),
         new BoolGameOption(easy_unequip,
                            { "easy_unequip", "easy_armour", "easy_armor" },
@@ -706,7 +695,6 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(bad_item_prompt), true),
         new BoolGameOption(SIMPLE_NAME(auto_hide_spells), false),
         new BoolGameOption(SIMPLE_NAME(menu_arrow_control), true),
-        new GameOptionHeading("Interface: Message and Display Enhancements"),
         new IntGameOption(SIMPLE_NAME(hp_warning), 30, 0, 100),
         new IntGameOption(magic_point_warning, {"mp_warning"}, 0, 0, 100),
         new ColourThresholdOption(hp_colour, {"hp_colour", "hp_color"},
@@ -776,14 +764,11 @@ const vector<GameOption*> game_options::build_options_list()
 #ifdef DGL_SIMPLE_MESSAGING
         new BoolGameOption(SIMPLE_NAME(messaging), false),
 #endif
-        new GameOptionHeading("Colours (messages and menus)"),
         new CustomListGameOption(&game_options::set_menu_colour,
                                  {"menu_colour"}, this),
         new CustomListGameOption(&game_options::set_message_colour,
                                  {"message_colour"}, this),
-        new GameOptionHeading("Interface: Message Channels"),
         opt_channel = new MenuGameOption({"channel"}),
-        new GameOptionHeading("Interface: Quivers, firing, and ammo"),
         new CustomStringGameOption(&game_options::set_fire_items_start,
                                    {"fire_items_start"}, this, "a"),
         new CustomListGameOption(&game_options::set_fire_order,
@@ -806,14 +791,12 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(launcher_autoquiver), true),
         (new BoolGameOption(SIMPLE_NAME(quiver_menu_focus), false))
             ->set_on_change(_dirty_prefs),
-        new GameOptionHeading("Interface: Inscriptions"),
         new CustomListGameOption(&game_options::set_autoinscribe,
                                  {"autoinscribe"}, this, "", "\n"),
         new MultipleChoiceGameOption<maybe_bool>(
             SIMPLE_NAME(show_god_gift), MB_MAYBE, MB_FALSE, MB_TRUE,
             {{"unidentified", MB_MAYBE}, {"unident", MB_MAYBE},
              {"unid", MB_MAYBE}}),
-        new GameOptionHeading("Interface: Macro related Options"),
         new BoolGameOption(flush_input[FLUSH_ON_FAILURE], {"flush.failure"},
                            true),
         new BoolGameOption(flush_input[FLUSH_BEFORE_COMMAND], {"flush.command"},
@@ -821,7 +804,6 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(flush_input[FLUSH_ON_MESSAGE], {"flush.message"},
                            false),
         new BoolGameOption(flush_input[FLUSH_LUA], {"flush.lua"}, true),
-        new GameOptionHeading("Interface: Tiles Options"),
 #ifdef USE_TILE
         new StringGameOption(SIMPLE_NAME(tile_show_items), "!?/=([)}:|"),
         new BoolGameOption(SIMPLE_NAME(tile_skip_title), false),
@@ -963,9 +945,7 @@ const vector<GameOption*> game_options::build_options_list()
             SIMPLE_NAME(tile_use_small_layout), MB_MAYBE, MB_MAYBE, MB_FALSE,
              MB_TRUE, {{"auto", MB_MAYBE}}),
 #endif
-        new GameOptionHeading("Character Dump: Saving"),
         new BoolGameOption(SIMPLE_NAME(dump_on_save), true),
-        new GameOptionHeading("Character Dump: Items and Kills"),
         new MultipleChoiceDefaultGameOption<int>(SIMPLE_NAME(dump_kill_places),
             KDO_ONE_PLACE, KDO_ONE_PLACE, {{"none", KDO_NO_PLACES},
             {"single", KDO_ONE_PLACE}, {"all", KDO_ALL_PLACES}}),
@@ -980,7 +960,6 @@ const vector<GameOption*> game_options::build_options_list()
                                  "skills,spells,overview,mutations,messages,"
                                  "screenshot,monlist,kills,notes,screenshots,"
                                  "vaults,skill_gains,action_counts"),
-        new GameOptionHeading("Character Dump: Notes"),
         new StringGameOption(SIMPLE_NAME(user_note_prefix), ""),
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_items)),
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_monsters)),
@@ -994,7 +973,6 @@ const vector<GameOption*> game_options::build_options_list()
         new ListGameOption<text_pattern>(SIMPLE_NAME(note_messages)),
         new BoolGameOption(SIMPLE_NAME(note_chat_messages), false),
         new BoolGameOption(SIMPLE_NAME(note_dgl_messages), true),
-        new GameOptionHeading("Miscellaneous: All OS"),
         new BoolGameOption(SIMPLE_NAME(mouse_input), false),
 #if defined(WIZARD) && !defined(DGAMELAUNCH)
 # ifdef DEBUG_DIAGNOSTICS
@@ -1026,9 +1004,7 @@ const vector<GameOption*> game_options::build_options_list()
         new CustomListGameOption(&game_options::set_fake_lang,
                                  _rcfile_equal_only, {"fake_lang"}, this),
         new BoolGameOption(SIMPLE_NAME(read_persist_options), false),
-        new GameOptionHeading("Miscellaneous: DOS and Windows"),
         new BoolGameOption(SIMPLE_NAME(dos_use_background_intensity), true),
-        new GameOptionHeading("Miscellaneous: Unix"),
         new BoolGameOption(SIMPLE_NAME(allow_extended_colours), true),
         new MultipleChoiceGameOption<maybe_bool>(
             SIMPLE_NAME(bold_brightens_foreground),
@@ -1039,14 +1015,11 @@ const vector<GameOption*> game_options::build_options_list()
         new ColourGameOption(SIMPLE_NAME(background_colour), BLACK),
         new ColourGameOption(SIMPLE_NAME(foreground_colour), LIGHTGREY),
         new BoolGameOption(SIMPLE_NAME(use_fake_cursor), USING_UNIX ),
-        new GameOptionHeading("Lua: Including lua files"),
         new ListGameOption<string>(SIMPLE_NAME(terp_files)),
-        new GameOptionHeading("Testing: Arena"),
         new BoolGameOption(SIMPLE_NAME(arena_dump_msgs), false),
         new BoolGameOption(SIMPLE_NAME(arena_dump_msgs_all), false),
         new BoolGameOption(SIMPLE_NAME(arena_list_eq), false),
 #ifdef WIZARD
-        new GameOptionHeading("Testing: Fight Simulator"),
         new StringGameOption(SIMPLE_NAME(fsim_mode), ""),
         new BoolGameOption(SIMPLE_NAME(fsim_csv), false),
         new StringGameOption(SIMPLE_NAME(fsim_mons), ""),
@@ -6043,8 +6016,8 @@ public:
             return filter_items();
         if ('?' == key)
         {
-            const auto *g = static_cast<GameOption*>(items[last_hovered]->data);
-            show_option_help(g->name());
+            auto *g = static_cast<GameOption*>(items[last_hovered]->data);
+            g->show_help();
             return CK_NO_KEY;
         }
         return key;
@@ -6105,7 +6078,7 @@ bool edit_game_prefs(MenuGameOption *parent)
 {
     bool change = false;
     auto list = parent ? parent->children
-                       : Options.get_option_behaviour();
+                       : Options.get_sorted_options();
     string selected;
     vector<pair<MenuEntry*, MenuEntry*>> refresh_other_on_change;
 
@@ -6119,6 +6092,7 @@ bool edit_game_prefs(MenuGameOption *parent)
 
     for (const auto option : list)
     {
+        ASSERT(option);
         if (option->parent != parent)
             continue;
         if (option->name().empty())

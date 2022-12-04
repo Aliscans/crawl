@@ -694,7 +694,7 @@ feature_item_highlight = reverse
         hidden by items. If you use this option, the item glyph(s) on the
         square are hidden by the feature symbol.
 
-trap_item_highlights = reverse
+trap_item_highlight = reverse
         Highlights traps that would otherwise be hidden by items. If you
         use this option, the item glyph(s) on the square are hidden by the trap
         symbol (^).

@@ -19,6 +19,7 @@
 #include "describe.h"
 #include "env.h"
 #include "files.h"
+#include "game-options.h"
 #include "hints.h"
 #include "invent.h"
 #include "item-prop.h"
@@ -1348,6 +1349,14 @@ static int _get_help_section(int section, formatted_string &header_out, formatte
     return 0;
 }
 
+static formatted_string _get_help_section(int section)
+{
+    formatted_string header_ignored, text_out;
+    int scroll_ignored;
+    _get_help_section(section, header_ignored, text_out, scroll_ignored);
+    return text_out;
+}
+
 class help_popup : public formatted_scroller
 {
 public:
@@ -1435,73 +1444,113 @@ void show_help(int section, string highlight_string)
     _show_help_special(key);
 }
 
-struct help_file_line {int section; int line;};
-// XXX - This looks for specific strings in the text. Turn it into markdown?
-static map<string, help_file_line>& _option_help_lines()
+vector<GameOption*> game_options::get_sorted_options()
 {
-    static map<string, help_file_line> option_help_lines;
-    if (!option_help_lines.empty())
-        return option_help_lines;
+    if (!options_sorted.empty())
+        return options_sorted;
 
-    formatted_string help, unused1;
+    // options_guide.txt - options start with "some_thing [+-^]?= "
+    int line = 0, section = '&', tmp, start, end;
+    string head, subhead;
+    GameOption* g;
+    char c[1], sub;
 
-    // Remember anything which starts with "some_thing [+-^]?= "
-    int line = 0, section = '&', unused2; // options_guide.txt
-    _get_help_section(section, unused1, help, unused2);
+    auto add_option = [&](GameOption *option)
+    {
+        if (option->has_help())
+            return;
+        if (!subhead.empty())
+        {
+            auto heading = new GameOptionHeading(subhead);
+            option_behaviour.push_back(heading); // put here for ~game_options
+            options_sorted.push_back(heading);
+            subhead = "";
+        }
+        option->set_help(section, line);
+        options_sorted.push_back(option);
+    };
+
+    formatted_string help = _get_help_section(section);
     for (auto text : help.ops)
     {
-        auto space = text.text.find(' ');
-        if (space && strchr("= ", text.text[space+2])
-            && space != text.text.npos && strchr("+-^=", text.text[space+1]))
+        if (1 == sscanf(text.text.c_str(), "%*s%n %*[+-^=]%*[= ] %c", &tmp, c)
+            && tmp && (g = option_from_name(text.text.substr(0, tmp))))
         {
-            option_help_lines[text.text.substr(0, space)] = {section, line};
+            add_option(g);
         }
+        // Category titles start with "?-? Title"
+        else if (2 == sscanf(text.text.c_str(), "%*[01234567]-%c %n%c",
+                             &sub, &tmp, c))
+        {
+            if (' ' == sub)
+            {
+                int len = text.text.find_last_not_of(".\n")+1;
+                head = subhead = text.text.substr(tmp, len-tmp);
+            }
+            else
+                subhead = head + ": " + text.text.substr(tmp);
+        }
+        // Two options are documented with a different format.
+        else if (1 == sscanf(text.text.c_str(), " %n%*[^. ]%n.%*[^=]=%c",
+                             &start, &end, c)
+                 && (g = option_from_name(text.text.substr(start, end-start))))
+        {
+            add_option(g);
+        }
+
         line++;
     }
-    // Remember anything which starts with "* some_thing: "
-    line = 0, section = CONTROL('A'); // arena.txt
-    _get_help_section(section, unused1, help, unused2);
+
+    // arena.txt - options start with "* some_thing: "
+    line = 0, section = CONTROL('A');
+    help = _get_help_section(section);
+    subhead = "Testing: Arena.";
     for (auto text : help.ops)
     {
-        auto space = text.text.find(" ", 2), colon = text.text.find(':', 2);
-        auto star = text.text.compare(0, 2, "* ");
-        if (!star && colon > 2 && colon != string::npos && colon+1 == space)
-            option_help_lines[text.text.substr(2, colon-2)] = {section, line};
+        if (1 == sscanf(text.text.c_str(), "*%*[ ]%*[^ :]:%n%c", &tmp, c)
+            && (g = option_from_name(text.text.substr(2, tmp-3))))
+        {
+            add_option(g);
+        }
         line++;
     }
 
 #ifdef WIZARD
     // Remember anything which starts with "some_thing [+-^]?= "
     line = 0, section = CONTROL('F'); // fight_simulator.txt
-    _get_help_section(section, unused1, help, unused2);
+    subhead = "Testing: Fight Simulator.";
+    help = _get_help_section(section);
     for (auto text : help.ops)
     {
-        auto space = text.text.find_first_of(" :", 0, 2),
-             colon = text.text.find(':');
-        if (space && colon && space != string::npos && colon != string::npos)
-            option_help_lines[text.text.substr(0, space)] = {section, line};
+        if (1 == sscanf(text.text.c_str(), "%*[^ :]%n%*[ :]%c", &tmp, c)
+            && (g = option_from_name(text.text.substr(0, tmp))))
+        {
+            add_option(g);
+        }
         line++;
     }
 #endif // WIZARD
-    return option_help_lines;
+
+    // List options which are in none of the above documents.
+    subhead = "Undocumented options.";
+    line = 0, section = '&'; // Default values, so set_help() does nothing.
+    for (auto g2 : get_option_behaviour())
+    {
+        if (!g2->has_help())
+        {
+            if (g2->parent)
+                g2->set_help(g2->parent);
+            else
+                add_option(g2);
+        }
+    }
+    return options_sorted;
 }
 
-// This is a help browser with the "offset in a text file" form of help_popup
-// and the string keys of show_specific_help().
-void show_option_help(const string &name)
+void GameOption::show_help()
 {
-    auto option_help_lines = _option_help_lines();
-    formatted_string help, unused1;
-    int unused2;
     formatted_scroller scr(FS_PREWRAPPED_TEXT);
-    if (!option_help_lines.count(name))
-        _get_help_section('&', unused1, help, unused2);
-    else
-    {
-        _get_help_section(option_help_lines[name].section, unused1, help,
-                          unused2);
-        scr.set_scroll(option_help_lines[name].line);
-    }
-    scr.add_raw_text(help, false);
+    scr.add_raw_text(_get_help_section(help_file), false);
+    scr.set_scroll(help_line);
     scr.show();
 }
