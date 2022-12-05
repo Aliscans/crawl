@@ -636,9 +636,23 @@ const string MenuGameOption::str() const
 
 string MenuGameOption::loadFromString(const string &field, rc_line_type ltyp)
 {
-    if (field.size())
-        return "Unrecognised/missing subkey for \""+name()+"\".";
-    return GameOption::loadFromString(field, ltyp);
+    vector<string> errors;
+    for (const auto &part : split_string(",", field))
+    {
+        auto insplit = split_string(":", part, true, false, 2);
+        if (insplit.size() < 2)
+            errors.push_back("Missing :. in '"+part+"'.");
+        else
+            Options.read_option_line(name()+"."+insplit[0]+"="+insplit[1]);
+    }
+    auto tostring = [] (const string &s) { return s; };
+    auto filter = [] (const string &s) { return !s.empty(); };
+    string msg = comma_separated_fn(errors.begin(), errors.end(), tostring,
+                                    " and ", ", ", filter);
+    if (!msg.empty())
+        return msg;
+    else
+        return GameOption::loadFromString(field, ltyp);
 }
 
 bool MenuGameOption::load_from_UI()
