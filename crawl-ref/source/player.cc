@@ -5070,6 +5070,7 @@ player::player()
 
     trapped            = false;
     triggered_spectral = false;
+    allow_autopickup   = true;
 
     last_view_update = 0;
 
