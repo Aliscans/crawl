@@ -115,6 +115,96 @@ private:
     GameOption *caller;
 };
 
+static string _make_clgo_title(string val)
+{
+    string item_title = replace_all(val, "<", "<<");
+    if (' ' == val[0])
+        return "<h>REMOVE</h>"+item_title;
+    return item_title;
+}
+
+// Every MenuEntry must be selectable, and must be backed by an entry in
+// CustomListGameOption::value.
+class CLGO_Menu : public Menu
+{
+public:
+    bool changed = false;
+
+    CLGO_Menu(int _flags, GameOption *_caller, vector<string> &_list,
+              bool _use_minus)
+        : Menu(_flags), caller(_caller), list(_list), use_minus(_use_minus)
+        { reset_items(); }
+
+    int pre_process(int key) override
+    {
+        if ('(' == key && last_hovered) // move item up the list
+        {
+            int other = last_hovered-1;
+            swap(list[last_hovered], list[other]);
+            reset_items();
+            changed = true;
+            key = CK_UP;
+        }
+        else if (')' == key && last_hovered != (int)items.size()-1) // down
+        {
+            int other = last_hovered+1;
+            swap(list[last_hovered], list[other]);
+            reset_items();
+            changed = true;
+            key = CK_DOWN;
+        }
+        else if ('+' == key) // add an item
+        {
+            list.insert(list.begin()+last_hovered, string());
+            reset_items();
+            changed = true;
+            key = CK_ENTER;
+        }
+        else if ('-' == key && use_minus) // add a REMOVE item
+        {
+            list.insert(list.begin()+last_hovered, " ");
+            reset_items();
+            changed = true;
+            key = CK_ENTER;
+        }
+        else if (CK_BKSP == key || CK_DELETE == key)
+            key = CK_ENTER; // sorry, no 1 key delete without an undelete.
+        else if ('?' == key)
+        {
+            caller->show_help();
+            key = CK_NO_KEY;
+        }
+        return key;
+    }
+
+    void reset_items()
+    {
+        clear();
+
+        for (unsigned i = 0, size = list.size(); i < size; ++i)
+        {
+            const char letter = index_to_letter(i % 52);
+            string item_title = _make_clgo_title(list[i]);
+            MenuEntry* entry = new EGP_MenuEntry(item_title, MEL_ITEM, 1,
+                                                 letter, 5);
+            entry->data = &list[i];
+            add_entry(entry);
+        }
+        if (!list.size()) // The user can't add to a blank list.
+        {
+            add_entry(new MenuEntry(dummy_string, 0,
+                                    [](const MenuEntry&){return true;}));
+        }
+        update_menu(true);
+    }
+
+private:
+    const string dummy_string = "<h>Press + to set this option.</h>";
+    GameOption *caller;
+    vector<string> &list;
+    bool use_minus;
+};
+
 /// Ask the user to choose between a set of options.
 ///
 /// @param[in] prompt Text to put above the options. Typically a question.
@@ -164,6 +254,76 @@ bool choose_option_from_UI(GameOption *caller, vector<string> choices)
     if (!selected.empty())
         caller->loadFromString(selected, RCFILE_LINE_EQUALS);
     return !selected.empty();
+}
+
+/// Ask the user to edit a game option using a list of strings.
+///
+/// @param[in,out] caller Option to edit. Reads various things.
+///                       Writes the updated values.
+/// @param[in,out] value  value of caller, as a list of strings.
+/// @param[in]     use_minus If true, - adds a request to remove something
+///                          (which loadFromString() evaluates).
+///                          If false, - does nothing.
+/// @returns       True if something has been changed, false otherwise.
+bool load_list_from_UI(GameOption *caller, vector<string> &value,
+                       bool use_minus)
+{
+    string prompt = string("Select a line to edit for \"")+caller->name()+"\":";
+
+    CLGO_Menu menu(MF_SINGLESELECT | MF_NO_SELECT_QTY | MF_ARROWS_SELECT
+                   | MF_ALLOW_FORMATTING | MF_INIT_HOVER,
+                   caller, value, use_minus);
+    menu.set_title(new MenuEntry(prompt, MEL_TITLE));
+    const string rem = use_minus ? " [<w>-</w>] add a REMOVE line" : "";
+    const string more = "<lightgrey>[<w>(</w>] move up [<w>)</w>] move down"
+                          " [<w>+</w>] add an ADD line"+rem
+                        + " [<w>?</w>] help</lightgrey>";
+    menu.set_more(formatted_string::parse_string(more));
+
+    menu.on_single_selection = [caller, &menu](const MenuEntry &entry)
+    {
+        auto *option_text = static_cast<string*>(entry.data);
+        unsigned remove = ' ' == option_text->c_str()[0] ? 1 : 0;
+        const string verb = remove ? "remove" : "add";
+        char select[1024];
+        string old = option_text->substr(remove), last = old;
+        while (1)
+        {
+            if (msgwin_get_line("Enter a value to "+verb+".",
+                                select, sizeof(select), nullptr, last))
+            {
+                if (!old.empty() && remove)
+                    *option_text = " "+old;
+                else
+                    *option_text = old;
+                caller->loadFromString(caller->str(), RCFILE_LINE_EQUALS);
+                if (old.empty())
+                    menu.reset_items();
+                return true;
+            }
+            *option_text = trimmed_string(select);
+            bool blank = option_text->empty();
+            if (remove && !blank)
+                option_text->insert(0, " ");
+            string error
+                = caller->loadFromString(caller->str(), RCFILE_LINE_EQUALS);
+            if (error.empty())
+            {
+                auto &text = const_cast<MenuEntry*>(&entry)->text;
+                if (blank)
+                    menu.reset_items();
+                else
+                    text = _make_clgo_title(*option_text);
+                menu.changed = true;
+                return true;
+            }
+            show_type_response(error);
+            last = select;
+        }
+    };
+
+    vector<MenuEntry*> sel = menu.show();
+    return menu.changed;
 }
 
 /// Ask the user to edit a game option using a text box.
@@ -456,96 +616,6 @@ string CustomListGameOption::loadFromString(const string &field,
     convert_ltyp(ltyp);
     return loadFromString_real(field, ltyp, true);
 }
-
-static string _make_clgo_title(string val)
-{
-    string item_title = replace_all(val, "<", "<<");
-    if (' ' == val[0])
-        return "<h>REMOVE</h>"+item_title;
-    return item_title;
-}
-
-// Every MenuEntry must be selectable, and must be backed by an entry in
-// CustomListGameOption::value.
-class CLGO_Menu : public Menu
-{
-public:
-    bool changed = false;
-
-    CLGO_Menu(int _flags, GameOption *_caller, vector<string> &_list,
-              bool _use_minus)
-        : Menu(_flags), caller(_caller), list(_list), use_minus(_use_minus)
-        { reset_items(); }
-
-    int pre_process(int key) override
-    {
-        if ('(' == key && last_hovered) // move item up the list
-        {
-            int other = last_hovered-1;
-            swap(list[last_hovered], list[other]);
-            reset_items();
-            changed = true;
-            key = CK_UP;
-        }
-        else if (')' == key && last_hovered != (int)items.size()-1) // down
-        {
-            int other = last_hovered+1;
-            swap(list[last_hovered], list[other]);
-            reset_items();
-            changed = true;
-            key = CK_DOWN;
-        }
-        else if ('+' == key) // add an item
-        {
-            list.insert(list.begin()+last_hovered, string());
-            reset_items();
-            changed = true;
-            key = CK_ENTER;
-        }
-        else if ('-' == key && use_minus) // add a REMOVE item
-        {
-            list.insert(list.begin()+last_hovered, " ");
-            reset_items();
-            changed = true;
-            key = CK_ENTER;
-        }
-        else if (CK_BKSP == key || CK_DELETE == key)
-            key = CK_ENTER; // sorry, no 1 key delete without an undelete.
-        else if ('?' == key)
-        {
-            caller->show_help();
-            key = CK_NO_KEY;
-        }
-        return key;
-    }
-
-    void reset_items()
-    {
-        clear();
-
-        for (unsigned i = 0, size = list.size(); i < size; ++i)
-        {
-            const char letter = index_to_letter(i % 52);
-            string item_title = _make_clgo_title(list[i]);
-            MenuEntry* entry = new EGP_MenuEntry(item_title, MEL_ITEM, 1,
-                                                 letter, 5);
-            entry->data = &list[i];
-            add_entry(entry);
-        }
-        if (!list.size()) // The user can't add to a blank list.
-        {
-            add_entry(new MenuEntry(dummy_string, 0,
-                                    [](const MenuEntry&){return true;}));
-        }
-        update_menu(true);
-    }
-
-private:
-    const string dummy_string = "<h>Press + to set this option.</h>";
-    GameOption *caller;
-    vector<string> &list;
-    bool use_minus;
-};
 
 bool CustomListGameOption::load_from_UI()
 {

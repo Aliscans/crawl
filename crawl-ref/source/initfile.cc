@@ -594,7 +594,7 @@ const vector<GameOption*> game_options::build_options_list()
         new MultipleChoiceGameOption<int>(SIMPLE_NAME(assign_item_slot),
             SS_FORWARD, {{"forward", SS_FORWARD}, {"backward", SS_BACKWARD}}),
         new IntGameOption(SIMPLE_NAME(pickup_menu_limit), 1),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(drop_filter)),
+        new TextPatternListGameOption(SIMPLE_NAME(drop_filter)),
         new ColourGameOption(SIMPLE_NAME(detected_monster_colour), LIGHTRED),
         new ColourGameOption(SIMPLE_NAME(detected_item_colour), GREEN),
         new ColourGameOption(SIMPLE_NAME(remembered_monster_colour), DARKGREY),
@@ -632,7 +632,7 @@ const vector<GameOption*> game_options::build_options_list()
         new CustomListGameOption(&game_options::set_travel_avoid_terrain,
                                  {"travel_avoid_terrain"}, this),
         new BoolGameOption(SIMPLE_NAME(explore_greedy), true),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(explore_stop_pickup_ignore)),
+        new TextPatternListGameOption(SIMPLE_NAME(explore_stop_pickup_ignore)),
         new IntGameOption(SIMPLE_NAME(explore_wall_bias), 0, 0, 1000),
         new IntGameOption(SIMPLE_NAME(explore_item_greed), 10, -1000, 1000),
         new BoolGameOption(SIMPLE_NAME(travel_key_stop), true),
@@ -647,7 +647,7 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(rest_wait_ancestor), false),
         new IntGameOption(SIMPLE_NAME(rest_wait_percent), 100, 0, 100),
         new BoolGameOption(SIMPLE_NAME(explore_auto_rest), true),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(auto_exclude)),
+        new TextPatternListGameOption(SIMPLE_NAME(auto_exclude)),
         new MultipleChoiceGameOption<travel_open_doors_type>(
              SIMPLE_NAME(travel_open_doors), travel_open_doors_type::open,
              travel_open_doors_type::_false, travel_open_doors_type::_true,
@@ -689,7 +689,7 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(easy_door), true),
         new BoolGameOption(SIMPLE_NAME(warn_hatches), false),
         new BoolGameOption(SIMPLE_NAME(enable_recast_spell), true),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(confirm_action)),
+        new TextPatternListGameOption(SIMPLE_NAME(confirm_action)),
         new BoolGameOption(SIMPLE_NAME(regex_search), false),
         new BoolGameOption(SIMPLE_NAME(autopickup_search), false),
         new BoolGameOption(SIMPLE_NAME(bad_item_prompt), true),
@@ -722,7 +722,7 @@ const vector<GameOption*> game_options::build_options_list()
         new IntGameOption(SIMPLE_NAME(mlist_min_height), 4, 0),
         new BoolGameOption(SIMPLE_NAME(mlist_allow_alternate_layout), false),
         new BoolGameOption(SIMPLE_NAME(monster_item_view_coordinates), false),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(monster_item_view_features)),
+        new TextPatternListGameOption(SIMPLE_NAME(monster_item_view_features)),
         new IntGameOption(SIMPLE_NAME(msg_min_height), max(7, MSG_MIN_HEIGHT),
                           MSG_MIN_HEIGHT),
         new IntGameOption(SIMPLE_NAME(msg_max_height), max(10, MSG_MIN_HEIGHT),
@@ -747,7 +747,7 @@ const vector<GameOption*> game_options::build_options_list()
 #ifdef USE_TILE_WEB
         (new BoolGameOption(SIMPLE_NAME(action_panel_show), true))
             ->set_on_change(_dirty_prefs),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(action_panel_filter)),
+        new TextPatternListGameOption(SIMPLE_NAME(action_panel_filter)),
         new BoolGameOption(SIMPLE_NAME(action_panel_show_unidentified), false),
         (new IntGameOption(SIMPLE_NAME(action_panel_scale), 100, 20, 1600))
             ->set_on_change(_dirty_prefs),
@@ -910,13 +910,11 @@ const vector<GameOption*> game_options::build_options_list()
 #endif
 #ifdef USE_TILE
         new StringGameOption(SIMPLE_NAME(tile_show_threat_levels), ""),
-        new ListGameOption<string>(SIMPLE_NAME(tile_layout_priority),
+        new StringListGameOption(SIMPLE_NAME(tile_layout_priority),
 #ifdef TOUCH_UI
-            split_string(",", "minimap, command, inventory, "
-                              "command2, spell, ability, monster")),
+            "minimap, command, inventory, command2, spell, ability, monster"),
 #else
-            split_string(",", "minimap, inventory, command, "
-                              "spell, ability, monster")),
+            "minimap, inventory, command, spell, ability, monster"),
 #endif
 #endif
 #ifdef USE_TILE_WEB
@@ -961,8 +959,8 @@ const vector<GameOption*> game_options::build_options_list()
                                  "screenshot,monlist,kills,notes,screenshots,"
                                  "vaults,skill_gains,action_counts"),
         new StringGameOption(SIMPLE_NAME(user_note_prefix), ""),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(note_items)),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(note_monsters)),
+        new TextPatternListGameOption(SIMPLE_NAME(note_items)),
+        new TextPatternListGameOption(SIMPLE_NAME(note_monsters)),
         new IntGameOption(SIMPLE_NAME(note_hp_percent), 5, 0, 100),
         new CustomListGameOption(&game_options::set_note_skill_levels,
                                  _rcfile_no_caret, {"note_skill_levels"}, this,
@@ -970,7 +968,7 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(note_all_skill_levels), false),
         new BoolGameOption(SIMPLE_NAME(note_skill_max), true),
         new BoolGameOption(SIMPLE_NAME(note_xom_effects), true),
-        new ListGameOption<text_pattern>(SIMPLE_NAME(note_messages)),
+        new TextPatternListGameOption(SIMPLE_NAME(note_messages)),
         new BoolGameOption(SIMPLE_NAME(note_chat_messages), false),
         new BoolGameOption(SIMPLE_NAME(note_dgl_messages), true),
         new BoolGameOption(SIMPLE_NAME(mouse_input), false),
@@ -1015,7 +1013,7 @@ const vector<GameOption*> game_options::build_options_list()
         new ColourGameOption(SIMPLE_NAME(background_colour), BLACK),
         new ColourGameOption(SIMPLE_NAME(foreground_colour), LIGHTGREY),
         new BoolGameOption(SIMPLE_NAME(use_fake_cursor), USING_UNIX ),
-        new ListGameOption<string>(SIMPLE_NAME(terp_files)),
+        new StringListGameOption(SIMPLE_NAME(terp_files)),
         new BoolGameOption(SIMPLE_NAME(arena_dump_msgs), false),
         new BoolGameOption(SIMPLE_NAME(arena_dump_msgs_all), false),
         new BoolGameOption(SIMPLE_NAME(arena_list_eq), false),
@@ -1024,8 +1022,8 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(fsim_csv), false),
         new StringGameOption(SIMPLE_NAME(fsim_mons), ""),
         new IntGameOption(SIMPLE_NAME(fsim_rounds), 4000, 1000, 500000),
-        new ListGameOption<string>(SIMPLE_NAME(fsim_scale)),
-        new ListGameOption<string>(SIMPLE_NAME(fsim_kit)),
+        new StringListGameOption(SIMPLE_NAME(fsim_scale)),
+        new StringListGameOption(SIMPLE_NAME(fsim_kit)),
 #endif
 #undef SIMPLE_NAME
     };
