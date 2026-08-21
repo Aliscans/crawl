@@ -276,8 +276,8 @@ void SkillMenuEntry::_clear()
 COLOURS SkillMenuEntry::get_colour() const
 {
     // Skills being actively trained may get further distinction.
-    bool use_bright_colour = you.train[m_sk] == TRAINING_ENABLED
-        || you.train[m_sk] == TRAINING_FOCUSED;
+    bool use_bright_colour = (you.train[m_sk] == TRAINING_ENABLED
+        || you.train[m_sk] == TRAINING_FOCUSED) && you.training[m_sk];
 
     if (is_set(SKMF_HELP))
         return LIGHTGRAY;
